@@ -415,7 +415,7 @@ EOF
     esac
 done
 FOF
-u```
+```
 
 Make the script executable:
 
