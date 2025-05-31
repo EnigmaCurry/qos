@@ -3,6 +3,8 @@
 This is a BBS that operates on amateur (ham) radio. No Internet
 required!
 
+This is still a work in progress.
+
 ## Hardware requirements
 
 This is just what I used specifically, but you may adapt this to
@@ -184,17 +186,27 @@ Create the startup script:
 ```
 cat <<'EOF' | sudo tee /usr/local/bin/kissattach-auto.sh
 #!/bin/bash
-set -euo pipefail
+set -euox pipefail
 
 AX_PORT="radio"
 TRIES=20
 SLEEP_INTERVAL=1
 
-for i in $(seq $TRIES); do
-    DEVICE=$(journalctl -u direwolf --no-pager -n 50 | grep -o '/dev/pts/[0-9]*' | tail -n1)
-    if [ -n "$DEVICE" ] && [ -e "$DEVICE" ]; then
+for i in $(seq "$TRIES"); do
+    DEVICE=$(journalctl -u direwolf --no-pager -n 50 \
+             | grep -o '/dev/pts/[0-9]*' | tail -n1)
+    if [[ -n $DEVICE && -e $DEVICE ]]; then
         echo "[kissattach] Found PTY: $DEVICE"
-        exec /usr/sbin/kissattach "$DEVICE" "$AX_PORT"
+
+        #--- Attach KISS device --------------------------------------------
+        /usr/sbin/kissattach "$DEVICE" "$AX_PORT"
+
+        #--- Tune KISS parameters ------------------------------------------
+        /usr/sbin/kissparms -p "$AX_PORT" \
+                            -t 150   \
+                            -s 10    \
+                            -r 191
+        exit 0
     fi
     echo "[kissattach] Waiting for Direwolf PTY... ($i/$TRIES)"
     sleep "$SLEEP_INTERVAL"
@@ -250,99 +262,6 @@ shown according to `/etc/ax25/axports`):
     link/ax25 AI7XP-1 brd QST-0 permaddr LINUX-1
 ```
 
-## Setup ax25d and the BBS script
-
-Create a `bbs` user to run the BBS:
-
-```
-sudo useradd -r -s /bin/bash -d /home/bbs bbs
-sudo mkdir -p /home/bbs
-sudo chown bbs:bbs /home/bbs
-```
-
-Create `/etc/ax25/ax25d.conf`:
-
-```
-cat <<EOF | sudo tee /etc/ax25/ax25d.conf
-[AI7XP-1]
-default  * * * * * *  - bbs  /usr/local/bin/bbs bbs
-EOF
-```
-
- * `default` means it will allow *any* callsign to connect to your
-   BBS.
- * Configure your own callsign+SSID (enclosed in square brackets on
-   the first line)
- * The program that will be run when clients connect is
-   `/usr/local/bin/bbs`.
-   
-Create a basic BBS script for initial testing purposes:
-
-```
-cat <<'EOF' | sudo tee /usr/local/bin/bbs
-#!/bin/bash
-# Simple AX.25 BBS script using ax25d environment variables
-
-: "${AX25_USER:=UNKNOWN}"
-
-echo ""
-echo "Welcome to the BBS on $AX25_CALL!"
-echo "You are connected via port: $AX25_PORT"
-echo "Remote callsign: $AX25_USER"
-echo "Type 'help' to see available commands."
-
-LOGFILE="/home/bbs/bbs.log"
-mkdir -p "$(dirname "$LOGFILE")"
-echo "$(date) - $AX25_USER connected to $AX25_CALL on $AX25_PORT" >> "$LOGFILE"
-
-while true; do
-    echo -n "> "
-    read -r cmd
-    case "$cmd" in
-        help)
-            echo "Available commands:"
-            echo "  help   - Show this help message"
-            echo "  list   - List messages"
-            echo "  read   - Read a message"
-            echo "  exit   - Disconnect"
-            ;;
-        list)
-            echo "Messages:"
-            echo "  1. Hello from $AX25_CALL"
-            echo "  2. Node test message"
-            ;;
-        read)
-            echo "Reading message 1:"
-            echo "--------------------"
-            echo "Hi $AX25_USER, welcome to the BBS!"
-            echo "Thanks for connecting to $AX25_CALL."
-            echo "73 de AI7XP"
-            echo "--------------------"
-            ;;
-        exit)
-            echo "Goodbye $AX25_USER!"
-            break
-            ;;
-        *)
-            echo "Unknown command. Type 'help' for available commands."
-            ;;
-    esac
-done
-EOF
-```
-
-Make the script executable:
-
-```
-sudo chmod a+x /usr/local/bin/bbs
-```
-
-Enable the ax25d service:
-
-```
-sudo systemctl enable --now ax25d
-```
-
 ## Configure the radio
 
  * Plug the twin prong K1 connector into the HT radio. Plug the other
@@ -360,19 +279,6 @@ Configure it the same way as the first one:
  * Configure direwolf
  * Configure /etc/ax25/axports
  * Configure kissattach
- * You *don't* need to configure ax25d on the client.
-
-## Call the BBS
-
-To connect the client to the BBS, run the `axcall` command, specifying
-the TNC and the callsign+SSID of the BBS:
-
-```
-axcall radio AI7XP-1
-```
-
-This should call the BBS, you should see the client radio transmit
-light turn red briefly. The BBS should now respond to you.
 
 ## Monitor connections
 
@@ -386,4 +292,177 @@ And check the logs:
 
 ```
 tail -f /home/bbs/bbs.log
+```
+
+## Make a test call
+
+To connect the client to the BBS, run the `axcall` command, specifying
+the TNC and the callsign+SSID of the BBS:
+
+```
+axcall radio AI7XP-1
+```
+
+This should call the BBS server. Although no actual BBS script is
+installed yet, and you won't get any response on the client yet, this
+should test that the client radio transmit light turn red briefly, and
+you should see the connection attempt via `axlisten` on the server:
+
+```
+# axlisten
+radio: fm AI7XP-2 to AI7XP-1 ctl SABM+ 21:34:59.246235 
+```
+
+## Setup ax25d and the BBS script
+
+ax25d is the daemon process that will listen for incoming connections
+and start and attach our BBS script.
+
+ * You only need to configure ax25d on the BBS server, not the client!
+
+Create a `bbs` user to run the BBS:
+
+```
+sudo useradd -r -s /bin/bash -d /home/bbs bbs
+sudo mkdir -p /home/bbs
+sudo chown bbs:bbs /home/bbs
+```
+
+Create `/etc/ax25/ax25d.conf` (it probably already exists, but you
+will be overwriting it):
+
+```
+cat <<EOF | sudo tee /etc/ax25/ax25d.conf
+[AI7XP-1]
+default  * * * * * *  - bbs  /usr/local/bin/bbs bbs
+EOF
+```
+
+ * `default` means it will allow *any* callsign to connect to your
+   BBS. You can create different scripts for different callers and
+   list them here, but for now we'll just have one.
+ * Configure your own callsign+SSID (enclosed in square brackets on
+   the first line)
+ * The program that will be run when clients connect is
+   `/usr/local/bin/bbs`.
+   
+Create a basic BBS script for initial testing purposes:
+
+```
+cat <<'FOF' | sudo tee /usr/local/bin/bbs
+#!/bin/bash
+# Simple AX.25 BBS script invoked by ax25d
+
+: "${AX25_CALL:=localhost}"
+: "${AX25_USER:=UNKNOWN}"
+: "${AX25_PORT:=local}"
+
+echo
+echo "Welcome to the BBS on $AX25_CALL!"
+echo "You are connected via port: $AX25_PORT"
+echo "Remote callsign: $AX25_USER"
+echo "Type 'help' to see available commands."
+
+LOGFILE="/home/bbs/bbs.log"
+mkdir -p "$(dirname "$LOGFILE")"
+printf '%s - %s connected to %s on %s\n' \
+       "$(date)" "$AX25_USER" "$AX25_CALL" "$AX25_PORT" >>"$LOGFILE"
+
+while true; do
+    printf '> \r\n'                # prompt with newline so it flushes.
+
+    # Read until CR (0x0D).  If the peer ever sends \n, we handle that too.
+    if ! IFS= read -r -d $'\r' cmd ; then
+        break                   # disconnect / EOF
+    fi
+    cmd=${cmd//$'\n'/}          # strip stray LF if CR‑LF arrives
+    cmd=${cmd//$'\r'/}          # strip CR just in case
+
+    case "$cmd" in
+        help)
+            cat <<'EOF'
+Available commands:
+  help   - Show this help message
+  list   - List messages
+  read   - Read a message
+  exit   - Disconnect
+EOF
+            ;;
+        list)
+            cat <<'EOF'
+Messages:
+  1. Hello from the sysop
+  2. Node test message
+EOF
+            ;;
+        read)
+            cat <<EOF
+Reading message 1:
+--------------------
+Hi $AX25_USER, welcome to the BBS!
+Thanks for connecting to $AX25_CALL.
+73 de AI7XP
+--------------------
+EOF
+            ;;
+        exit)
+            echo "Goodbye $AX25_USER!"
+            break
+            ;;
+        *)
+            echo "Unknown command.  Type 'help' for available commands."
+            ;;
+    esac
+done
+FOF
+u```
+
+Make the script executable:
+
+```
+sudo chmod a+x /usr/local/bin/bbs
+```
+
+Enable the ax25d service:
+
+```
+cat <<EOF | sudo tee /etc/systemd/system/ax25d.service
+[Unit]
+Description=AX.25 daemon
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ax25d -l
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+```
+sudo systemctl enable --now ax25d &
+```
+
+Check that is starts up:
+
+```
+journalctl --unit ax25d | tail
+```
+
+```
+May 30 22:42:58 tnc systemd[1]: Starting ax25d.service - AX.25 daemon...
+May 30 22:42:58 tnc ax25d[1762]: starting
+May 30 22:42:58 tnc ax25d[1762]: new config file loaded successfully
+```
+
+## Call the BBS
+
+Now that ax25d is listening and the BBS script is installed, you can
+connect to it from the client:
+
+
+```
+# On the client:
+axcall radio AI7XP-1 
 ```
