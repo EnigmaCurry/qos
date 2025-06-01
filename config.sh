@@ -18,6 +18,18 @@ configure_sound_input_device() {
     save SOUND_DEVICE_INPUT
 }
 
+configure_volume_input_device() {
+    local SOUND_DEVICE_INPUT=$(get SOUND_DEVICE_INPUT)
+    ask_valid SOUND_VOLUME_INPUT "Enter the INPUT volume (decimal between 0 and 1)" validate_decimal
+    save SOUND_VOLUME_INPUT
+}
+
+configure_volume_output_device() {
+    local SOUND_DEVICE_OUTPUT=$(get SOUND_DEVICE_OUTPUT)
+    ask_valid SOUND_VOLUME_OUTPUT "Enter the OUTPUT volume (decimal between 0 and 1)" validate_decimal
+    save SOUND_VOLUME_OUTPUT
+}
+
 configure_sound_output_device() {
     mapfile -t devices < <(get_pipewire_output_devices)
     if [ "${#devices[@]}" -eq 0 ]; then
@@ -52,7 +64,11 @@ config() {
     echo
     configure_sound_input_device
     echo
+    configure_volume_input_device
+    echo
     configure_sound_output_device
+    echo
+    configure_volume_output_device
     echo
     configure_ptt_rts
     echo

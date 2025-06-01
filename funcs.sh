@@ -21,7 +21,6 @@ debug_var() {
     check_var var
     stderr "## DEBUG: ${var}=${!var}"
 }
-
 debug_array() {
     local -n ary=$1
     echo "## DEBUG: Array '$1' contains:"
@@ -247,6 +246,17 @@ validate_int() {
         return 1
     fi
 }
+
+validate_decimal() {
+    local input="$*"
+    if [[ "$input" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        return 0
+    else
+        stderr "Invalid decimal. Enter a decimal number only."
+        return 1
+    fi
+}
+
 upcase() {
     local input="$*"
     echo "${input^^}"
@@ -284,10 +294,10 @@ install_packages() {
 get_pipewire_devices() {
     local class="$1"
     check_var class
-    pw-dump | jq -r '
+    pw-dump | jq -r --arg class "$class" '
         .[]
         | select(.type == "PipeWire:Interface:Node")
-        | select(.info.props."media.class" == "'"$class"'")
+        | select(.info.props."media.class" == $class)
         | .info.props."node.description"
         ' | grep -v '^null$'
 }
@@ -306,18 +316,21 @@ get_pipewire_device() {
     check_var class search
     debug_var class
     debug_var search
+
     local id
-    id=$(pw-dump | jq -r --arg desc "$search" '
+    id=$(pw-dump | jq -r --arg class "$class" --arg desc "$search" '
         .[]
         | select(.type == "PipeWire:Interface:Node")
-        | select(.info.props."media.class" == "$class")
+        | select(.info.props."media.class" == $class)
         | select(.info.props."node.description"? // "" | test($desc; "i"))
         | .id
     ' | head -n 1)
+
     if [[ -z "$id" ]]; then
-        stderr "No matching PipeWire input device named '$search'"
+        stderr "No matching PipeWire device named '$search'"
         return 1
     fi
+
     echo "$id"
 }
 
@@ -362,4 +375,16 @@ check_not_root() {
     if [ "$(id -u)" -eq 0 ]; then
         fault "Error: This script should not be run as root."
     fi
+}
+
+set_pipewire_device_volume() {
+    local pipewire_id=$1
+    local volume=$2
+    check_var pipewire_id
+    check_decimal volume
+    if ! wpctl inspect ${pipewire_id} >/dev/null; then
+        stderr "Could not set volume of device."
+        fault "Invalid pipewire device id: ${pipewire_id}"
+    fi
+    wpctl set-volume ${pipewire_id} ${volume}
 }
