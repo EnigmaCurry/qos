@@ -3,7 +3,6 @@ error(){ stderr "Error: $@"; }
 cancel(){ stderr "Canceled."; exit 2; }
 fault(){ test -n "$1" && error $1; stderr "Exiting."; exit 1; }
 wizard() { ${SCRIPT_DIR}/script-wizard "$@"; }
-
 check_var(){
     local __missing=false
     local __vars="$@"
@@ -16,6 +15,19 @@ check_var(){
     if [[ ${__missing} == true ]]; then
         fault
     fi
+}
+debug_var() {
+    local var=$1
+    check_var var
+    stderr "## DEBUG: ${var}=${!var}"
+}
+
+debug_array() {
+    local -n ary=$1
+    echo "## DEBUG: Array '$1' contains:"
+    for i in "${!ary[@]}"; do
+        echo "## ${i} = ${ary[$i]}"
+    done
 }
 
 dotenv() {
@@ -196,16 +208,16 @@ ask_valid() {
 }
 
 get() {
-    check_var 1
-    dotenv -f ${SCRIPT_DIR}/.env get $1
+    check_var ENV_FILE 1
+    dotenv -f ${ENV_FILE} get $1
 }
 
 save() {
-    check_var 1
-    local EXISTING=$(get $1)
+    check_var ENV_FILE 1
+    local EXISTING="$(get $1)"
     if [[ "$EXISTING" != "${!1}" ]]; then
-        dotenv -f ${SCRIPT_DIR}/.env set $1=${!1}
-        echo "# Saved .env : ${1}=${!1}"
+        dotenv -f ${ENV_FILE} set $1="${!1}"
+        echo "# Saved ${ENV_FILE} : ${1}=${!1}"
     fi
 }
 
@@ -269,3 +281,85 @@ install_packages() {
     echo
 }
 
+get_pipewire_devices() {
+    local class="$1"
+    check_var class
+    pw-dump | jq -r '
+        .[]
+        | select(.type == "PipeWire:Interface:Node")
+        | select(.info.props."media.class" == "'"$class"'")
+        | .info.props."node.description"
+        ' | grep -v '^null$'
+}
+
+get_pipewire_input_devices() {
+    get_pipewire_devices "Audio/Source"
+}
+
+get_pipewire_output_devices() {
+    get_pipewire_devices "Audio/Sink"
+}
+
+get_pipewire_device() {
+    local class="$1"
+    local search="$2"
+    check_var class search
+    debug_var class
+    debug_var search
+    local id
+    id=$(pw-dump | jq -r --arg desc "$search" '
+        .[]
+        | select(.type == "PipeWire:Interface:Node")
+        | select(.info.props."media.class" == "$class")
+        | select(.info.props."node.description"? // "" | test($desc; "i"))
+        | .id
+    ' | head -n 1)
+    if [[ -z "$id" ]]; then
+        stderr "No matching PipeWire input device named '$search'"
+        return 1
+    fi
+    echo "$id"
+}
+
+get_pipewire_input_device() {
+    get_pipewire_device "Audio/Source" "$1"
+}
+
+get_pipewire_output_device() {
+    get_pipewire_device "Audio/Sink" "$1"
+}
+
+
+check_os_is_debian() {
+    if [ ! -f /etc/debian_version ]; then
+        fault "This script only supports Debian-based systems."
+    else
+        echo "## Debian $(cat /etc/debian_version) or similar OS detected."
+    fi
+
+}
+
+setup_pipewire() {
+    echo "[+] Enabling systemd lingering for user: $USER"
+    sudo loginctl enable-linger "$USER"
+    echo "[+] Enabling PipeWire services for user: $USER"
+    systemctl --user daemon-reexec
+    systemctl --user daemon-reload
+    systemctl --user enable --now pipewire.service pipewire.socket wireplumber.service
+    echo "[✓] PipeWire and WirePlumber enabled for user $USER"
+    echo
+}
+
+check_has_sudo() {
+    # Prompt for password if needed and validate sudo session
+    echo "## Checking for sudo privileges ..."
+    if [[ "$(sudo -u root whoami)" != "root" ]]; then
+        fault "Failed to authenticate with sudo."
+    fi
+}
+
+check_not_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        fault "Error: This script should not be run as root."
+    fi
+}
