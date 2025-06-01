@@ -155,6 +155,14 @@ install_script_wizard() {
 }
 
 ask_valid() {
+    ## Ask a question to set a var and pass it through a series of validators and mutators.
+    ##   ask_valid VAR_NAME "Prompt for VAR_NAME:" [mutators...] [validators...]
+    ## Validators are functions that must be named with the `validator_` prefix.
+    ##   Validators check the passed value and return true (0) or false (1).
+    ## Mutators are functions that may have any other name.
+    ##   Mutators take the passed value and return a modified value.
+    ## Example:
+    ##   ask_valid CALLSIGN "Enter your CALLSIGN:" upcase validate_callsign
     local varname="$1"
     local prompt="$2"
     shift 2
@@ -163,10 +171,10 @@ ask_valid() {
     local value
     for fn in "$@"; do
         if declare -f "$fn" >/dev/null; then
-            if [[ "$fn" == mutate_* ]]; then
-                mutators+=("$fn")
-            else
+            if [[ "$fn" == validate_* ]]; then
                 validators+=("$fn")
+            else
+                mutators+=("$fn")
             fi
         else
             echo "Warning: function '$fn' not found" >&2
@@ -183,6 +191,7 @@ ask_valid() {
         for validator in "${validators[@]}"; do
             if ! "$validator" "$value"; then
                 valid=false
+                echo
                 break
             fi
         done
@@ -243,7 +252,7 @@ validate_int() {
         return 1
     fi
 }
-mutate_upcase() {
+upcase() {
     local input="$*"
     echo "${input^^}"
 }
@@ -276,7 +285,7 @@ setup() {
     install_script_wizard ${SCRIPT_DIR}
 
     ## CALLSIGN
-    ask_valid CALLSIGN "Enter your callsign:" validate_word mutate_upcase validate_callsign
+    ask_valid CALLSIGN "Enter your callsign:" upcase validate_callsign
     save CALLSIGN
 }
 
