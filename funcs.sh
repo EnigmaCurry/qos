@@ -1,4 +1,4 @@
-stderr(){ echo "$@" >/dev/stderr; }
+stderr(){ echo "$@" >&2; }
 error(){ stderr "Error: $@"; }
 cancel(){ stderr "Canceled."; exit 2; }
 fault(){ test -n "$1" && error $1; stderr "Exiting."; exit 1; }
