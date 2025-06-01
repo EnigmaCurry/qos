@@ -151,22 +151,7 @@ install_script_wizard() {
         fi
         bash <(curl ${INSTALLER}) "${DEST}"
     fi
-}
-
-check_deps() {
-    local missing=""
-    for dep in "$@"; do
-        echo -n "Looking for ${dep} ... " >&2
-        if ! command -v "${dep}" >/dev/null 2>&1; then
-            echo "Missing!" >&2
-            missing="${missing} ${dep}"
-        else
-            dep_path=$(command -v "${dep}" || true)
-            echo "found ${dep_path}" >&2
-        fi
-    done
-    [[ -n "${missing}" ]] && fault "Missing dependencies:${missing}"
-    true
+    echo
 }
 
 ask_valid() {
@@ -208,7 +193,6 @@ ask_valid() {
         fi
     done
 }
-
 
 get() {
     check_var 1
