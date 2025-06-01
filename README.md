@@ -461,7 +461,6 @@ May 30 22:42:58 tnc ax25d[1762]: new config file loaded successfully
 Now that ax25d is listening and the BBS script is installed, you can
 connect to it from the client:
 
-
 ```
 # On the client:
 axcall radio AI7XP-1 

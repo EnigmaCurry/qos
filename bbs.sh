@@ -2,7 +2,7 @@
 
 set -e
 
-SCRIPT_DIR=$(dirname ${BASH_SOURCE})
+SCRIPT_DIR=$(realpath $(dirname ${BASH_SOURCE}))
 ENV_FILE=${SCRIPT_DIR}/.env
 
 source ${SCRIPT_DIR}/funcs.sh
@@ -22,12 +22,25 @@ setup() {
     config
 }
 
+direwolf_menu() {
+    if [[ -z "$1" ]]; then
+        wizard menu "Dire Wolf" \
+               "Status (press Q to quit) = systemctl status --user direwolf -n 100 -l | less || true" \
+               "Enable Dire Wolf service = ${BASH_SOURCE} enable_direwolf_service" \
+               "Disable Dire Wolf service = ${BASH_SOURCE} disable_direwolf_service" \
+               "Done = exit 2"
+    else
+        "$@"
+    fi
+}
+
 main() {
     if [[ -z "$1" ]]; then
         wizard menu "BBS Admin Menu" \
-               "Setup = ${BASH_SOURCE} setup" \
+               "Config = ${BASH_SOURCE} setup" \
                "Show config = (echo; set -x; cat $(realpath ${ENV_FILE})) " \
-               "Exit = exit 1"
+               "Dire Wolf = ${BASH_SOURCE} direwolf_menu" \
+               "Done = exit 1"
     else
         "$@"
     fi
