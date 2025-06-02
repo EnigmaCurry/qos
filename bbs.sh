@@ -14,7 +14,6 @@ dependencies() {
     check_has_sudo
     install_packages ${DEPENDENCIES[@]}
     install_script_wizard ${SCRIPT_DIR}
-    setup_pipewire
 }
 
 setup() {

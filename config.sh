@@ -3,19 +3,46 @@
 set -e
 
 DEPENDENCIES=(
-    ax25-apps ax25-tools direwolf
-    pipewire pulseaudio-utils wireplumber
-    jq git curl
+    ax25-apps ax25-tools direwolf jq git curl
 )
 
-configure_sound_input_device() {
-    mapfile -t devices < <(get_pipewire_input_devices)
-    if [ "${#devices[@]}" -eq 0 ]; then
-        fault "No audio input devices found."
+__configure_sound_device() {
+    local varname="$1"
+    local prompt="$2"
+    check_var varname prompt
+    mapfile -t full_devices < <(list_alsa_device_names)
+    if [ "${#full_devices[@]}" -eq 0 ]; then
+        fault "No audio devices found."
     fi
-    local existing_device=$(get SOUND_DEVICE_INPUT)
-    SOUND_DEVICE_INPUT="$(wizard choose "Select your INPUT sound device" "${devices[@]}" --default "$existing_device")"
-    save SOUND_DEVICE_INPUT
+    local existing_device
+    existing_device=$(get "$varname")
+    local descriptions=()
+    local dev_names=()
+    local default_display=""
+    for entry in "${full_devices[@]}"; do
+        IFS='|' read -r dev desc <<< "$entry"
+        dev_names+=("$dev")
+        desc="${desc#"${desc%%[![:space:]]*}"}"  # trim leading space
+        descriptions+=("$desc")
+
+        # If this dev matches the saved name, remember the description
+        if [[ "$dev" == "$existing_device" ]]; then
+            default_display="$desc"
+        fi
+    done
+    local index
+    index=$(wizard choose -n "$prompt" "${descriptions[@]}" --default "$default_display")
+    local selected="${dev_names[$index]}"
+    printf -v "$varname" '%s' "$selected"
+    save "$varname"
+}
+
+configure_sound_input_device() {
+    __configure_sound_device SOUND_DEVICE_INPUT "Select your INPUT sound device"
+}
+
+configure_sound_output_device() {
+    __configure_sound_device SOUND_DEVICE_OUTPUT "Select your OUTPUT sound device"
 }
 
 configure_volume_input_device() {
@@ -28,16 +55,6 @@ configure_volume_output_device() {
     local SOUND_DEVICE_OUTPUT=$(get SOUND_DEVICE_OUTPUT)
     ask_valid SOUND_VOLUME_OUTPUT "Enter the OUTPUT volume (decimal between 0 and 1)" validate_decimal
     save SOUND_VOLUME_OUTPUT
-}
-
-configure_sound_output_device() {
-    mapfile -t devices < <(get_pipewire_output_devices)
-    if [ "${#devices[@]}" -eq 0 ]; then
-        fault "No audio output devices found."
-    fi
-    local existing_device=$(get SOUND_DEVICE_OUTPUT)
-    SOUND_DEVICE_OUTPUT="$(wizard choose "Select your OUTPUT sound device" "${devices[@]}" --default "$existing_device")"
-    save SOUND_DEVICE_OUTPUT
 }
 
 configure_ptt_rts() {
@@ -64,11 +81,11 @@ config() {
     echo
     configure_sound_input_device
     echo
-    configure_volume_input_device
+    #configure_volume_input_device
     echo
     configure_sound_output_device
     echo
-    configure_volume_output_device
+    #configure_volume_output_device
     echo
     configure_ptt_rts
     echo

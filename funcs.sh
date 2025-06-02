@@ -208,13 +208,16 @@ ask_valid() {
 
 get() {
     check_var ENV_FILE 1
-    dotenv -f ${ENV_FILE} get $1
+    local default="${2:-}"
+    local value="$(dotenv -f ${ENV_FILE} get $1)"
+    value="${value:-$default}"
+    echo "$value"
 }
 
 save() {
-    check_var ENV_FILE 1
-    local EXISTING="$(get $1)"
-    if [[ "$EXISTING" != "${!1}" ]]; then
+   check_var ENV_FILE 1
+    local existing="$(get $1)"
+    if [[ "$existing" != "${!1}" ]]; then
         dotenv -f ${ENV_FILE} set $1="${!1}"
         echo "# Saved ${ENV_FILE} : ${1}=${!1}"
     fi
@@ -291,57 +294,6 @@ install_packages() {
     echo
 }
 
-get_pipewire_devices() {
-    local class="$1"
-    check_var class
-    pw-dump | jq -r --arg class "$class" '
-        .[]
-        | select(.type == "PipeWire:Interface:Node")
-        | select(.info.props."media.class" == $class)
-        | .info.props."node.description"
-        ' | grep -v '^null$'
-}
-
-get_pipewire_device() {
-    local class="$1"
-    local search="$2"
-    check_var class search
-    debug_var class
-    debug_var search
-
-    local id
-    id=$(pw-dump | jq -r --arg class "$class" --arg desc "$search" '
-        .[]
-        | select(.type == "PipeWire:Interface:Node")
-        | select(.info.props."media.class" == $class)
-        | select(.info.props."node.description"? // "" | test($desc; "i"))
-        | .id
-    ' | head -n 1)
-
-    if [[ -z "$id" ]]; then
-        stderr "No matching PipeWire device named '$search'"
-        return 1
-    fi
-
-    echo "$id"
-}
-
-get_pipewire_input_devices() {
-    get_pipewire_devices "Audio/Source"
-}
-
-get_pipewire_input_device() {
-    get_pipewire_device "Audio/Source" "$1"
-}
-
-get_pipewire_output_devices() {
-    get_pipewire_devices "Audio/Sink"
-}
-
-get_pipewire_output_device() {
-    get_pipewire_device "Audio/Sink" "$1"
-}
-
 check_os_is_debian() {
     if [ ! -f /etc/debian_version ]; then
         fault "This script only supports Debian-based systems."
@@ -349,17 +301,6 @@ check_os_is_debian() {
         echo "## Debian $(cat /etc/debian_version) or similar OS detected."
     fi
 
-}
-
-setup_pipewire() {
-    echo "[+] Enabling systemd lingering for user: $USER"
-    sudo loginctl enable-linger "$USER"
-    echo "[+] Enabling PipeWire services for user: $USER"
-    systemctl --user daemon-reexec
-    systemctl --user daemon-reload
-    systemctl --user enable --now pipewire.service pipewire.socket wireplumber.service
-    echo "[✓] PipeWire and WirePlumber enabled for user $USER"
-    echo
 }
 
 check_has_sudo() {
@@ -376,73 +317,39 @@ check_not_root() {
     fi
 }
 
-set_pipewire_device_volume() {
-    local pipewire_id="$1"
-    local volume="$2"
-    check_var pipewire_id
-    validate_decimal "${volume}"
-    if ! wpctl inspect ${pipewire_id} >/dev/null; then
-        stderr "Could not set volume of device."
-        fault "Invalid pipewire device id: ${pipewire_id}"
-    fi
-    wpctl set-volume "${pipewire_id}" "${volume}"
-    wpctl set-mute "${pipewire_id}" 0
-}
-
-set_pipewire_input_device_volume() {
-    local pipewire_input="$1"
-    local volume="$2"
-    check_var pipewire_input
-    validate_decimal "${volume}"
-    local pipewire_id="$(get_pipewire_input_device "${pipewire_input}")"
-    set_pipewire_device_volume "${pipewire_id}" "${volume}"
-}
-
-set_pipewire_output_device_volume() {
-    local pipewire_output="$1"
-    local volume="$2"
-    check_var pipewire_output
-    validate_decimal "${volume}"
-    local pipewire_id="$(get_pipewire_output_device "${pipewire_output}")"
-    set_pipewire_device_volume "${pipewire_id}" "${volume}"
-}
-
-get_plughw_name_for_pipewire_id() {
-    local node_id="$1"
-    check_var node_id
-    pw-dump | jq -r --argjson id "$node_id" '
-        .[]
-        | select(.id == $id)
-        | .info.props
-        | "\(.["alsa.card"] // "unknown"),\(.["alsa.device"] // "unknown")"
-    ' | awk -F, '{
-        if ($1 == "unknown" || $2 == "unknown") {
-            print "Error: ALSA card/device not found" > "/dev/stderr"
-            exit 1
+create_asoundrc() {
+    local card="$1"
+    local device="${2:-0}"
+    local ALSA_DEV_ALIAS=$(get ALSA_DEV_ALIAS radio)
+    check_var card
+    cat <<EOF > ${HOME}/.asoundrc
+pcm.$ALSA_DEV_ALIAS {
+    type plug
+    slave {
+        pcm {
+            type hw
+            card $card
+            device $device
         }
-        print "plughw:" $1 "," $2
-    }'
+    }
+}
+
+ctl.$ALSA_DEV_ALIAS {
+    type hw
+    card $card
+}
+EOF
 }
 
 create_direwolf_config() {
     check_var ENV_FILE
     CALLSIGN="$(get CALLSIGN)"
-    SOUND_DEVICE_INPUT="$(get SOUND_DEVICE_INPUT)"
-    SOUND_DEVICE_OUTPUT="$(get SOUND_DEVICE_OUTPUT)"
-    PTT_RTS_DEVICE="$(get PTT_RTS_DEVICE)"
-    check_var CALLSIGN SOUND_DEVICE_INPUT SOUND_DEVICE_OUTPUT
-    PIPEWIRE_INPUT_DEVICE="$(get_pipewire_input_device "${SOUND_DEVICE_INPUT}")"
-    PIPEWIRE_OUTPUT_DEVICE="$(get_pipewire_output_device "${SOUND_DEVICE_OUTPUT}")"
-    check_var PIPEWIRE_INPUT_DEVICE PIPEWIRE_OUTPUT_DEVICE
-    PLUGHW_INPUT_DEVICE="$(get_plughw_name_for_pipewire_id ${PIPEWIRE_INPUT_DEVICE})"
-    PLUGHW_OUTPUT_DEVICE="$(get_plughw_name_for_pipewire_id ${PIPEWIRE_OUTPUT_DEVICE})"
-    check_var PLUGHW_INPUT_DEVICE PLUGHW_OUTPUT_DEVICE
     cat <<EOF > ${SCRIPT_DIR}/direwolf.conf
 ## DON'T EDIT ${SCRIPT_DIR}/direwolf.conf!
 ## This file is overwritten by the main BBS config script each time it is run.
 EOF
     cat <<EOF >> ${SCRIPT_DIR}/direwolf.conf
-ADEVICE  ${PLUGHW_INPUT_DEVICE} ${PLUGHW_OUTPUT_DEVICE}
+ADEVICE  radio
 EOF
     cat <<EOF >> ${SCRIPT_DIR}/direwolf.conf
 CHANNEL 0
@@ -503,17 +410,30 @@ disable_direwolf_service() {
     return 0
 }
 
-set_sound_volumes() {
-    SOUND_DEVICE_INPUT=$(get SOUND_DEVICE_INPUT)
-    SOUND_DEVICE_OUTPUT=$(get SOUND_DEVICE_OUTPUT)
-    SOUND_VOLUME_INPUT=$(get SOUND_VOLUME_INPUT)
-    SOUND_VOLUME_OUTPUT=$(get SOUND_VOLUME_OUTPUT)
-    set_pipewire_input_device_volume "${SOUND_DEVICE_INPUT}" "${SOUND_VOLUME_INPUT}"
-    set_pipewire_output_device_volume "${SOUND_DEVICE_OUTPUT}" "${SOUND_VOLUME_OUTPUT}"
-}
-
 start_direwolf() {
     create_direwolf_config
     set_sound_volumes
     /usr/bin/direwolf -p -t 0 -c ${SCRIPT_DIR}/direwolf.conf
+}
+
+list_alsa_device_names() {
+    local buffer=""
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*([0-9]+)[[:space:]]+\[([^\]]+)\][[:space:]]*:\ ([^[:space:]]+)\ -\ (.*)$ ]]; then
+            # If there's a previous buffered description, print it
+            if [[ -n "$buffer" ]]; then
+                echo "$buffer"
+            fi
+            buffer="${BASH_REMATCH[3]} - ${BASH_REMATCH[4]}|"
+        elif [[ -n "$buffer" && -n "$line" ]]; then
+            # Trim leading whitespace from continuation line
+            line="${line#"${line%%[![:space:]]*}"}"
+            buffer+="$line"
+        fi
+    done < /proc/asound/cards
+
+    # Print last buffer
+    if [[ -n "$buffer" ]]; then
+        echo "$buffer"
+    fi
 }
