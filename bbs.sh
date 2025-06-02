@@ -25,8 +25,9 @@ setup() {
 direwolf_menu() {
     if [[ -z "$1" ]]; then
         wizard menu "Dire Wolf" \
-               "Status (press Q to quit) = systemctl status --user direwolf -n 100 -l | less || true" \
-               "Enable Dire Wolf service = ${BASH_SOURCE} enable_direwolf_service" \
+               "Status (press Q to quit) = systemctl status --user direwolf || true" \
+               "Logs (press Ctrl-C to quit) =  journalctl -f _SYSTEMD_USER_UNIT=direwolf.service || true" \
+               "Enable (restart) Dire Wolf service = ${BASH_SOURCE} enable_direwolf_service" \
                "Disable Dire Wolf service = ${BASH_SOURCE} disable_direwolf_service" \
                "Done = exit 2"
     else
