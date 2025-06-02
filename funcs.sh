@@ -223,6 +223,20 @@ save() {
     fi
 }
 
+set_default() {
+    check_var ENV_FILE 1
+    local varname="$1"
+    local default="$2"
+    check_var varname default
+    local existing
+    existing="$(get "$varname")"
+    if [[ -z "$existing" ]]; then
+        printf -v "$varname" '%s' "$default"
+        dotenv -f "$ENV_FILE" set "$varname=${!varname}"
+        echo "# Set default in ${ENV_FILE} : ${varname}=${!varname}"
+    fi
+}
+
 config_ask() {
     # config THING "Please enter your thing"
     check_var 1 2
@@ -338,6 +352,16 @@ ctl.$ALSA_DEV_ALIAS {
     type hw
     card $card
 }
+
+pcm.default {
+    type plug
+    slave.pcm "${ALSA_DEV_ALIAS}"
+}
+
+ctl.default {
+    type hw
+    card $card
+}
 EOF
 }
 
@@ -410,10 +434,37 @@ disable_direwolf_service() {
     return 0
 }
 
+set_sound_volumes() {
+    local SOUND_DEVICE
+    SOUND_DEVICE="$(get SOUND_DEVICE)"
+    local SOUND_VOLUME_INPUT
+    SOUND_VOLUME_INPUT="$(get SOUND_VOLUME_INPUT 0)"
+    local SOUND_VOLUME_OUTPUT
+    SOUND_VOLUME_OUTPUT="$(get SOUND_VOLUME_OUTPUT 0.25)"
+    check_var SOUND_DEVICE SOUND_VOLUME_INPUT SOUND_VOLUME_OUTPUT
+    local card_index
+    card_index=$(get_sound_card_index "$SOUND_DEVICE") || return 1
+    local input_percent output_percent
+    input_percent=$(awk -v v="$SOUND_VOLUME_INPUT" 'BEGIN { printf "%d%%", v * 100 }')
+    output_percent=$(awk -v v="$SOUND_VOLUME_OUTPUT" 'BEGIN { printf "%d%%", v * 100 }')
+    # Unmute and set playback (output) volume
+    amixer -c "$card_index" sset Master "$output_percent" unmute || true
+    amixer -c "$card_index" sset Speaker "$output_percent" unmute || true
+    amixer -c "$card_index" sset PCM "$output_percent" unmute || true
+    # Unmute and set capture (input) volume
+    amixer -c "$card_index" sset Capture "$input_percent" cap || true
+    amixer -c "$card_index" sset Mic "$input_percent" cap || true
+}
+
+
 start_direwolf() {
+    local SOUND_DEVICE="$(get SOUND_DEVICE)"
+    check_var SOUND_DEVICE
+    local device_index=$(get_sound_card_index "${SOUND_DEVICE}")
+    create_asoundrc "${device_index}"
     create_direwolf_config
     set_sound_volumes
-    /usr/bin/direwolf -p -t 0 -c ${SCRIPT_DIR}/direwolf.conf
+    /usr/bin/direwolf -p -t 0 -c "${SCRIPT_DIR}/direwolf.conf"
 }
 
 list_alsa_device_names() {
@@ -431,9 +482,30 @@ list_alsa_device_names() {
             buffer+="$line"
         fi
     done < /proc/asound/cards
-
     # Print last buffer
     if [[ -n "$buffer" ]]; then
         echo "$buffer"
+    fi
+}
+
+get_sound_card_index() {
+    local search="$1"
+    check_var search
+    local index=""
+    local current_index=""
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*([0-9]+)[[:space:]]+\[([^\]]+)\][[:space:]]*:\ ([^[:space:]]+)\ -\ (.*)$ ]]; then
+            current_index="${BASH_REMATCH[1]}"
+            local dev="${BASH_REMATCH[3]} - ${BASH_REMATCH[4]}"
+            if [[ "$dev" == "$search" ]]; then
+                index="$current_index"
+                break
+            fi
+        fi
+    done < /proc/asound/cards
+    if [[ -n "$index" ]]; then
+        echo "$index"
+    else
+        fault "Could not find card index for: $search"
     fi
 }

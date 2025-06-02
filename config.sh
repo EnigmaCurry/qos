@@ -37,22 +37,18 @@ __configure_sound_device() {
     save "$varname"
 }
 
-configure_sound_input_device() {
-    __configure_sound_device SOUND_DEVICE_INPUT "Select your INPUT sound device"
-}
-
-configure_sound_output_device() {
-    __configure_sound_device SOUND_DEVICE_OUTPUT "Select your OUTPUT sound device"
+configure_sound_device() {
+    __configure_sound_device SOUND_DEVICE "Select your sound device"
 }
 
 configure_volume_input_device() {
-    local SOUND_DEVICE_INPUT=$(get SOUND_DEVICE_INPUT)
-    ask_valid SOUND_VOLUME_INPUT "Enter the INPUT volume (decimal between 0 and 1)" validate_decimal
+    set_default SOUND_VOLUME_INPUT 0
+    ask_valid SOUND_VOLUME_INPUT "Enter the INPUT volume GAIN (decimal between 0 and 1)" validate_decimal
     save SOUND_VOLUME_INPUT
 }
 
 configure_volume_output_device() {
-    local SOUND_DEVICE_OUTPUT=$(get SOUND_DEVICE_OUTPUT)
+    set_default SOUND_VOLUME_OUTPUT 0.25
     ask_valid SOUND_VOLUME_OUTPUT "Enter the OUTPUT volume (decimal between 0 and 1)" validate_decimal
     save SOUND_VOLUME_OUTPUT
 }
@@ -79,13 +75,11 @@ configure_callsign() {
 config() {
     configure_callsign
     echo
-    configure_sound_input_device
+    configure_sound_device
     echo
-    #configure_volume_input_device
+    configure_volume_input_device
     echo
-    configure_sound_output_device
-    echo
-    #configure_volume_output_device
+    configure_volume_output_device
     echo
     configure_ptt_rts
     echo
