@@ -16,7 +16,7 @@ git clone https://github.com/EnigmaCurry/bbs.git ~/bbs
 ** Configure your callsign + station ID
 
 ```
-MY_CALLSIGN=AI7XP-1
+MY_CALLSIGN=AI7XP-2
 
 echo "${MY_CALLSIGN}" | tee ~/bbs/my_callsign.txt
 ```
@@ -35,17 +35,18 @@ echo "radio    ${MY_CALLSIGN}    1200    255    2    BTECH UV-PRO" \
 ~/bbs/bt_pair.exp
 ```
 
-** Bind rfcomm device
+** Bind rfcomm device and attach KISS TNC
 
 ```
-read -r MAC_ADDRESS < ~/bbs/mac_address.txt
-sudo rfcomm bind /dev/rfcomm0 ${MAC_ADDRESS} 1
-```
-
-** Attach to the KISS TNC
-
-```
-sudo kissattach /dev/rfcomm0 radio
+(
+    set -ex
+    read -r MAC_ADDRESS < ~/bbs/mac_address.txt
+    sudo killall kissattach || true
+    sudo rfcomm release /dev/rfcomm0 2>/dev/null
+    sudo rfcomm bind /dev/rfcomm0 ${MAC_ADDRESS} 1
+    sleep 5
+    sudo kissattach /dev/rfcomm0 radio
+)
 ```
 
 ** Verify `ax0` device exists
@@ -57,7 +58,6 @@ $ ip link
     link/ax25 AI7XP-1 brd QST-0 permaddr LINUX-1
 ```
 
-
 ** Enable ax25d
 
 ```
@@ -65,6 +65,24 @@ read -r MY_CALLSIGN < ~/bbs/my_callsign.txt
 
 cat <<EOF | sudo tee /etc/ax25/ax25d.conf
 [${MY_CALLSIGN}]
-default * * * * * * *  root  /usr/local/bin/bbs.py BBS ${MY_CALLSIGN} %d %S
+default * * * * * * *  ${USER}  ${HOME}/bbs/bbs.py BBS ${MY_CALLSIGN} %S
 EOF
+
+
+cat <<EOF | sudo tee /etc/systemd/system/ax25d.service
+[Unit]
+Description=AX.25 Daemon
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/ax25d -l
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now ax25d &
 ```
