@@ -13,11 +13,18 @@ sudo apt install -y ax25-tools ax25-apps expect git
 git clone https://github.com/EnigmaCurry/bbs.git ~/bbs
 ```
 
-** Configure AX.25 ports
+** Configure your callsign + station ID
 
 ```
 MY_CALLSIGN=AI7XP-1
 
+echo "${MY_CALLSIGN}" | tee ~/bbs/my_callsign.txt
+```
+
+** Configure AX.25 ports
+
+```
+read -r MY_CALLSIGN < ~/bbs/my_callsign.txt
 echo "radio    ${MY_CALLSIGN}    1200    255    2    BTECH UV-PRO" \
     | sudo tee /etc/ax25/axports
 ```
@@ -31,7 +38,7 @@ echo "radio    ${MY_CALLSIGN}    1200    255    2    BTECH UV-PRO" \
 ** Bind rfcomm device
 
 ```
-read -r MAC_ADDRESS __group < ~/bbs/bt_device_info.txt
+read -r MAC_ADDRESS < ~/bbs/mac_address.txt
 sudo rfcomm bind /dev/rfcomm0 ${MAC_ADDRESS} 1
 ```
 
@@ -51,3 +58,13 @@ $ ip link
 ```
 
 
+** Enable ax25d
+
+```
+read -r MY_CALLSIGN < ~/bbs/my_callsign.txt
+
+cat <<EOF | sudo tee /etc/ax25/ax25d.conf
+[${MY_CALLSIGN}]
+default * * * * * * *  root  /usr/local/bin/bbs.py BBS ${MY_CALLSIGN} %d %S
+EOF
+```
