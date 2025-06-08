@@ -26,6 +26,12 @@ area.
 The BTECH UV-PRO (and similar radios) need to be updated to run the
 latest firmware. To do this follow these steps:
 
+ * On the radio, put it into pairing mode. 
+   * Under `Menu`,
+     * `General Settings`
+       * `Connection`
+         * `Pairing` (toggle ON)
+
  * Use an android smartphone and download the BTECH app from the play
    store.
  * Open the app and pair with a "Walkie Talkie". 
