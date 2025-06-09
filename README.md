@@ -1,18 +1,14 @@
 # AX.25 Packet BBS
 
-This is a BBS that operates on amateur (ham) radio. No Internet
-required!
-
-This is still a work in progress.
+This is an electronic bulletin board system (BBS) that operates on
+amateur (ham) radio. No Internet required!
 
 ## Goal
 
-Setup an electronic bulletin board system (BBS) using a BTECH UV-PRO
-amateur radio (HT), which includes a bluetooth KISS TNC that can be
-paired and bonded with the Linux bluetooth and AX.25 network stack. A
-Raspberry Pi will operate a 1200 baud AFSK BBS service on 2M or 70cm
-FM amateur radio. Install an appropriate antenna for the local service
-area.
+To setup a Raspberry Pi to operate a 1200 baud AFSK BBS service on 2M
+or 70cm FM amateur radio. The station will use a BTECH UV-PRO amateur
+radio (HT), which includes a bluetooth KISS TNC that can be paired and
+bonded with the Linux bluetooth and AX.25 network stack. 
 
 ## Prep a Raspberry Pi
 
@@ -26,7 +22,7 @@ area.
 The BTECH UV-PRO (and similar radios) need to be updated to run the
 latest firmware. To do this follow these steps:
 
- * Use an android smartphone and download the BTECH app from the play
+ * Use an Android smartphone and download the BTECH app from the play
    store.
 
  * On the radio, put it into pairing mode. 
