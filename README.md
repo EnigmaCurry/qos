@@ -128,7 +128,7 @@ EOF
 cat <<EOF | sudo tee /etc/systemd/system/ax25d.service
 [Unit]
 Description=AX.25 Daemon
-After=network.target
+After=rfcomm-kiss.service
 
 [Service]
 Type=forking
