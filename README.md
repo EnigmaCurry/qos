@@ -14,7 +14,8 @@ first connection only. This means that whenever you reboot your Linux
 computer, you also need to power cycle the radio. 
 
 ## Credits
-This software repository includes many script and things taken from
+
+This software repository includes many scripts and things taken from
 elsewhere. Here is a catalog of them all:
 
  * Bluetooth pairing script ([bt_pair.exp](_script/bt_pair.exp)) for
