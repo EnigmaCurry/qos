@@ -289,24 +289,56 @@ validate_callsign() {
     fi
 }
 
+check_is_systemd() {
+    [ "$(ps -p 1 -o comm=)" = "systemd" ]
+}
+
+check_is_debian() {
+    [ -f /etc/debian_version ]
+}
+
+check_is_fedora() {
+    [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]
+}
 
 install_packages() {
-    if ! check_rpm_ostree; then
-        echo "Error: This function is intended for rpm-ostree systems."
-        return 1
+    if check_is_debian; then
+        # Debian/Ubuntu logic
+        local missing=()
+        for pkg in "$@"; do
+            dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
+        done
+        if [ ${#missing[@]} -eq 0 ]; then
+            return 0
+        fi
+        echo "Missing packages : ${missing[*]}"
+        wizard confirm "Do you wish to install these missing packages via apt?" yes
+        sudo apt update
+        sudo apt install -y "${missing[@]}"
+    elif check_is_fedora; then
+        # Fedora/CentOS/RHEL logic
+        local missing=()
+        for pkg in "$@"; do
+            rpm -q "$pkg" &>/dev/null || missing+=("$pkg")
+        done
+        if [ ${#missing[@]} -eq 0 ]; then
+            return 0
+        fi
+        echo "Missing packages : ${missing[*]}"
+        if check_rpm_ostree; then
+            wizard confirm "Do you wish to install these missing packages via rpm-ostree?" yes
+            sudo rpm-ostree install "${missing[@]}"
+            echo -e "\nYou must now reboot."
+            exit 0
+        else
+            wizard confirm "Do you wish to install these missing packages via dnf?" yes
+            sudo dnf install -y "${missing[@]}"
+        fi
+    else
+        echo "Unsupported system OS" >&2
+        cat /etc/os-release 2>/dev/null | grep "^NAME" || true
+        exit 1
     fi
-    local missing=()
-    for pkg in "$@"; do
-        rpm -q "$pkg" &> /dev/null || missing+=("$pkg")
-    done
-    if [ ${#missing[@]} -eq 0 ]; then
-        #echo -e "## All packages were found.\n"
-        return 0
-    fi
-    echo "Installing missing packages via rpm-ostree override: ${missing[*]}"
-    sudo rpm-ostree install "${missing[@]}"
-    echo -e "\nYou must now reboot."
-    exit 0
 }
 
 check_rpm_ostree() {
@@ -327,15 +359,11 @@ check_has_sudo() {
 }
 
 check_root() {
-    if [ "$(id -u)" -ne 0 ]; then
-        fault "Error: This script should be run as root."
-    fi
+    [ "$(id -u)" -eq 0 ]
 }
 
 check_not_root() {
-    if [ "$(id -u)" -eq 0 ]; then
-        fault "Error: This script should not be run as root."
-    fi
+    [ "$(id -u)" -ne 0 ];
 }
 
 create_asoundrc() {

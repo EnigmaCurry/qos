@@ -2,9 +2,53 @@
 
 set -e
 
-DEPENDENCIES=(
+FEDORA_DEPENDENCIES=(
     ax25-apps ax25-tools jq git curl expect bluez bluez-tools bluez-deprecated kernel-modules-extra
 )
+
+DEBIAN_DEPENDENCIES=(
+    ax25-apps ax25-tools jq git curl expect bluez bluez-tools
+)
+
+dependencies() {
+    check_root || fault "You must run this script as root."
+    check_is_systemd || fault "Sorry, only machines with systemd are supported."
+    if check_is_debian; then
+        install_packages ${DEBIAN_DEPENDENCIES[@]}
+    elif check_is_fedora; then
+        install_packages ${FEDORA_DEPENDENCIES[@]}
+    else
+        echo "Unsupported system OS" >&2
+        cat /etc/os-release 2>/dev/null | grep "^NAME" || true
+        exit 1
+    fi
+    install_script_wizard ${QOS_DIR}/_script
+
+}
+
+
+pair() {
+    RFCOMM_MAC_ADDRESS=$(get RFCOMM_MAC_ADDRESS)
+    if [[ -n "$RFCOMM_MAC_ADDRESS" ]]; then
+        wizard confirm "Do you wish to unset the existing RFCOMM_MAC_ADDRESS (${RFCOMM_MAC_ADDRESS}) ?" yes
+        bluetoothctl remove "$RFCOMM_MAC_ADDRESS" || true
+        RFCOMM_MAC_ADDRESS=""
+        save RFCOMM_MAC_ADDRESS
+        sleep 2
+    fi
+    tmp_file=$(mktemp)
+    expect ${QOS_DIR}/_script/bt_pair.exp "${tmp_file}"
+    read -r RFCOMM_MAC_ADDRESS < ${tmp_file}
+    check_var RFCOMM_MAC_ADDRESS || fault "Found no bluetooth MAC address for the radio"
+    echo "MAC ADDRESS: ${RFCOMM_MAC_ADDRESS}"
+    save RFCOMM_MAC_ADDRESS
+}
+
+check_rfcomm_kiss() {
+    systemctl --no-pager status rfcomm-kiss || true
+    echo
+    ip link show dev ax0 || true
+}
 
 # __configure_sound_device() {
 #     local varname="$1"
