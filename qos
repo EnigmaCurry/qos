@@ -31,13 +31,19 @@ pair() {
     save RFCOMM_MAC_ADDRESS
 }
 
+check_rfcomm_kiss() {
+    systemctl --no-pager status rfcomm-kiss || true
+    echo
+    ip link show dev ax0 || true
+}
+
 config_menu() {
     if [[ -z "$1" ]]; then
         wizard menu "bbs config" \
                "settings (Callsign) = ${BASH_SOURCE} config" \
                "pair (BTECH UV-PRO and clones) = ${BASH_SOURCE} pair" \
                "enable (rfcomm KISS service) = ${BASH_SOURCE} configure_rfcomm_service" \
-               "check (AX.25 connection) = ip link show dev ax0 || true" \
+               "check (AX.25 connection) = ${BASH_SOURCE} check_rfcomm_kiss" \
                "show (Config) = (echo; set -x; cat $(realpath ${ENV_FILE})) "
     else
         "$@"

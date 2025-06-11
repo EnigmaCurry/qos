@@ -103,7 +103,7 @@ EOF
     ## This is to evade the SELinux enforcement against running scripts in $HOME.
     cat <<EOF | tee /usr/local/bin/connect_radio.sh
 #!/bin/bash
-/bin/bash ${QOS_DIR}/connect_radio.sh
+/bin/bash ${QOS_DIR}/_script/connect_radio.sh
 EOF
     chmod +x /usr/local/bin/connect_radio.sh
     systemctl daemon-reload

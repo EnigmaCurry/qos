@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 QOS_DIR=$(realpath $(dirname ${BASH_SOURCE})/..)
-read -r MAC_ADDRESS < $(${QOS_DIR}/qos get RFCOMM_MAC_ADDRESS)
+MAC_ADDRESS="$(${QOS_DIR}/qos get RFCOMM_MAC_ADDRESS)"
 killall kissattach || true
 rfcomm release /dev/rfcomm0 2>/dev/null || true
 rfcomm bind /dev/rfcomm0 "${MAC_ADDRESS}" 1
