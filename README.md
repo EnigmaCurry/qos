@@ -16,16 +16,18 @@ A Linux computer that runs systemd:
 
 Support for the following radios is available:
 
- * BTECH UV-PRO, Vero VR‑N76, Radioddity GA-5WB, and other clones.
-   (These are all essentially the same radio) - these radios
-   communicate with Linux via bluetooth (KISS TNC).
+ * BTECH UV-PRO, Vero VR‑N76, Radioddity GA-5WB (these are all
+   essentially the same radio) - these radios feature a bluetooth
+   (serial) KISS TNC, which is directly supported by the Linux kernel
+   AX.25 stack (direwolf is not required).
  * More radios TODO.
 
 ## Get started
 
 ### Setup radio
 
-Follow the directions to setup your radio, then come back here.
+Follow the directions to setup your specific radio, then come back
+here to setup Linux.
 
  * [BTECH UV-PRO, Vero VR-N76, Radioddity GA-5WB](#btech-uv-pro-vero-vr-n76-radioddity-ga-5wb)
 
@@ -46,8 +48,16 @@ git clone https://github.com/EnigmaCurry/QOS.git ~/qos
 cd ~/qos
 ```
 
- * Run `qos` to access the main menu, allowing you to configure and manage the system.
+ * (Optional) Add `~/qos` to your `PATH` environment var.
  
+```
+## In ~/.bashrc
+export PATH="${PATH}:${HOME}/qos"
+```
+
+ * To access the main menu, run `~/qos/qos` (or `qos`, if you modified
+   the `PATH`).
+
 ## Setup AX.25
 
  * From the `QOS` main menu, choose `ax25`, and go through the
@@ -57,7 +67,7 @@ cd ~/qos
    * Once paired, choose `enable (rfcomm KISS service)`.
    * Choose `check (AX.25 connection)` and verify the service started.
  
-If successful, the status should show the service is `active
+If successful, the status should show the service is `Active: active
 (exited)`, and you should see the details for a network device named
 `ax0`, which does not show an IP address, but instead shows your
 station callsign, e.g.:
@@ -70,6 +80,10 @@ station callsign, e.g.:
 4: ax0: <BROADCAST,UP,LOWER_UP> mtu 255 qdisc pfifo_fast state UNKNOWN mode DEFAULT group default qlen 10
     link/ax25 AI7XP-2 brd QST-0 permaddr LINUX-1
 ```
+
+ * Reboot the machine and test that the interface is persistent and
+   comes back up (use the `check` menu again or run `ip link show dev
+   ax0`).
 
 ## Setup Radio
 
@@ -98,7 +112,7 @@ Once updated, use the radio menu to setup the TNC:
  * Under Menu
    * `General Settings`
      * `Connection`
-       * Find the smartphone you paired earlier, and UNPAIR it, so
+       * Find the smartphone you paired earlier, and `UNPAIR` it, so
          that it won't interfere with your Linux connection.
      * `Signaling Settings`
        * Set the `ID` to your station callsign + id. This setting is
@@ -110,13 +124,24 @@ Once updated, use the radio menu to setup the TNC:
        * `Enable KISS TNC` (toggle ON)
    * `Radio Settings`
      * `Power` 
-       * Choose high, medium, or low, depending on your range.
+       * Choose the low power setting for testing, and increase it
+         depending on your need.
      * `Tail Elimination` (toggle OFF)
      * `Digital Mute`
        * Optional, on or off, depending if you like to hear the
        *outgoing* modem sounds.
  
- * Tune the radio to the desired frequency.
+ * Tune the radio to the desired frequency (e.g., `145.050`).
+ 
+   * Consult your local band plan.
+   * [ARRL](https://www.arrl.org/band-plan)
+     * [Packet Radio Frequency Recommendations of the Committee on
+       Amatuer Radio Digital
+       Communication](https://www.arrl.org/files/file/8803051.pdf)
+   * [UTVHF society](https://utahvhfs.org/bandplan1.html)
+   * Suggestions:
+     * `145.01`, `145.03`, `145.05`, `145.07`, `145.09`
+   
  * Turn the radio off and back on.
 
 #### Troubleshooting
