@@ -8,8 +8,9 @@ ENV_FILE=${QOS_DIR}/.env
 SCRIPT_DIR=$QOS_DIR/_script
 
 source ${QOS_DIR}/_script/funcs.sh
-source ${QOS_DIR}/_script/config.sh
 source ${QOS_DIR}/_script/menu.sh
+source ${QOS_DIR}/_script/config.sh
+source ${QOS_DIR}/_script/apps.sh
 
 declare -A MENU_TREE=(
     [root]="config apps"
@@ -38,10 +39,6 @@ config() {
 
 apps() {
     generate_menu "qos apps" "$@"
-}
-
-config_show() {
-    cat "$(realpath "$ENV_FILE")"
 }
 
 # config_ax25() {

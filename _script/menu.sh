@@ -49,7 +49,7 @@ generate_menu() {
         local full_key="${path:+$path/}$sub"
         local desc="${MENU_DESC[$full_key]}"
         local cmd="${QOS_BIN} ${prefix}${sub}"
-        choices+=("$sub = $cmd${desc:+ # $desc}")
+        choices+=("$sub ${desc:+($desc)} = $cmd")
     done
     debug_array choices
     wizard menu "$title" "${choices[@]}"
