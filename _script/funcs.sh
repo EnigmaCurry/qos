@@ -186,7 +186,6 @@ install_script_wizard() {
         fi
         bash <(curl ${INSTALLER}) "${DEST}"
     fi
-    echo
 }
 
 ask_valid() {

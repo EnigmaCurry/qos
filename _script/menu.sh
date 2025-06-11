@@ -24,7 +24,6 @@ generate_menu() {
         shift
 
         if [[ "$path" == "root" && "${MENU_TREE[$sub]+_}" ]]; then
-            # e.g. qos config [show]
             local nested_path="$sub"
 
             if [[ $# -gt 0 ]]; then
@@ -32,7 +31,6 @@ generate_menu() {
                 shift
                 dispatch_path_command "$nested_path" "$nested_sub" "$@"
             else
-                echo menu fallback
                 generate_menu "qos $nested_path"
             fi
         else
@@ -44,13 +42,30 @@ generate_menu() {
     local prefix=""
     [[ "$path" != "root" ]] && prefix="$path "
 
+    local -a subs
+    IFS=' ' read -ra subs <<< "$(get_valid_subcommands "$path")"
+
+    # Find the longest subcommand name
+    local max_len=0
+    for sub in "${subs[@]}"; do
+        (( ${#sub} > max_len )) && max_len=${#sub}
+    done
+
+    # Construct aligned choices
     local choices=()
-    for sub in $(get_valid_subcommands "$path"); do
+    for sub in "${subs[@]}"; do
         local full_key="${path:+$path/}$sub"
         local desc="${MENU_DESC[$full_key]}"
         local cmd="${QOS_BIN} ${prefix}${sub}"
-        choices+=("$sub ${desc:+($desc)} = $cmd")
+        if [[ -n "$desc" ]]; then
+            # Pad sub name to max_len + 2 spaces
+            printf -v padded "%-*s" $((max_len + 2)) "$sub"
+            choices+=("$padded($desc) = $cmd")
+        else
+            choices+=("$sub = $cmd")
+        fi
     done
-    debug_array choices
+
+    #debug_array choices
     wizard menu "$title" "${choices[@]}"
 }
