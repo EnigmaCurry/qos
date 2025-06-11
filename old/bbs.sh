@@ -2,18 +2,18 @@
 
 set -e
 
-SCRIPT_DIR=$(realpath $(dirname ${BASH_SOURCE}))
-ENV_FILE=${SCRIPT_DIR}/.env
+QOS_DIR=$(realpath $(dirname ${BASH_SOURCE}))
+ENV_FILE=${QOS_DIR}/.env
 
-source ${SCRIPT_DIR}/funcs.sh
-source ${SCRIPT_DIR}/config.sh
+source ${QOS_DIR}/funcs.sh
+source ${QOS_DIR}/config.sh
 
 dependencies() {
     check_os_is_debian
     check_not_root
     check_has_sudo
     install_packages ${DEPENDENCIES[@]}
-    install_script_wizard ${SCRIPT_DIR}
+    install_script_wizard ${QOS_DIR}
 }
 
 setup() {

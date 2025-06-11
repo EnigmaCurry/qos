@@ -16,7 +16,7 @@ DEPENDENCIES=(
 #     fi
 #     local existing_device
 #     existing_device=$(get "$varname")
-#     local descriptions=()
+#     local descriptons=()
 #     local dev_names=()
 #     local default_display=""
 #     for entry in "${full_devices[@]}"; do
@@ -103,7 +103,7 @@ EOF
     ## This is to evade the SELinux enforcement against running scripts in $HOME.
     cat <<EOF | tee /usr/local/bin/connect_radio.sh
 #!/bin/bash
-/bin/bash ${HOME}/bbs/connect_radio.sh
+/bin/bash ${QOS_DIR}/connect_radio.sh
 EOF
     chmod +x /usr/local/bin/connect_radio.sh
     systemctl daemon-reload
@@ -113,6 +113,39 @@ EOF
     echo "Power cycle the radio and then reboot."
     echo
     exit 1
+}
+
+configure_ax25d_service() {
+    CALLSIGN=$(get CALLSIGN)
+    cat <<EOF | sudo tee /etc/ax25/ax25d.conf
+[${CALLSIGN}]
+default * * * * * * *  ${USER}  ${QOS_DIR}/bbs.py BBS ${CALLSIGN} %S
+EOF
+
+    cat <<EOF | tee /etc/systemd/system/ax25d.service
+[Unit]
+Description=AX.25 Daemon
+After=rfcomm-kiss.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/ax25d_start.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    ## Create wrapper script in /usr/local/bin that runs our own script
+    ## This is to evade the SELinux enforcement against running scripts in $HOME.
+    cat <<EOF | tee /usr/local/bin/ax25d_start.sh
+#!/bin/bash
+/bin/bash ${QOS_DIR}/ax25d/start.sh
+EOF
+    chmod +x /usr/local/bin/ax25d_start.sh
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now ax25d
 }
 
 config() {

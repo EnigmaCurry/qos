@@ -7,6 +7,16 @@
 # Timeout for expect commands
 set timeout 30
 
+
+puts "argc = [llength $argv]"
+puts "argv = $argv"
+# Grab the first argument: a file path to write the MAC address to
+if {[llength $argv] < 1} {
+    puts stderr "Usage: $argv0 <output_file>"
+    exit 1
+}
+set tmp_mac_address_file [lindex $argv 0]
+
 # List of target device names
 set device_names {"VR-N76" "UV-PRO" "GA-5WB" "TH-D75" "TH-D74" "VR-N7500"}
 set group_one {"VR-N76" "UV-PRO" "GA-5WB" "VR-N7500"}
@@ -99,10 +109,7 @@ expect eof
 
 
 # Save the MAC address and group info
-set script_dir [file dirname [info script]]
-set output_file [file join $script_dir "mac_address.txt"]
-set file [open $output_file "w"]
+set file [open $tmp_mac_address_file "w"]
 puts $file "$device"
 close $file
-puts "MAC address and group information saved to $output_file."
-
+puts "MAC address and group information saved to $tmp_mac_address_file"

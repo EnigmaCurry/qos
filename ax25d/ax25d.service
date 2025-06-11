@@ -1,0 +1,12 @@
+[Unit]
+Description=AX.25 Daemon
+After=rfcomm-kiss.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/ax25d.sh
+PIDFile=/var/run/ax25d.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

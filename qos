@@ -1,0 +1,72 @@
+#!/bin/bash
+
+set -e
+
+QOS_DIR=$(realpath $(dirname ${BASH_SOURCE}))
+ENV_FILE=${QOS_DIR}/.env
+
+source ${QOS_DIR}/_script/funcs.sh
+source ${QOS_DIR}/_script/config.sh
+
+dependencies() {
+    check_root
+    install_packages ${DEPENDENCIES[@]}
+    install_script_wizard ${QOS_DIR}/_script
+}
+
+pair() {
+    RFCOMM_MAC_ADDRESS=$(get RFCOMM_MAC_ADDRESS)
+    if [[ -n "$RFCOMM_MAC_ADDRESS" ]]; then
+        wizard confirm "Do you wish to unset the existing RFCOMM_MAC_ADDRESS (${RFCOMM_MAC_ADDRESS}) ?" yes
+        bluetoothctl remove "$RFCOMM_MAC_ADDRESS" || true
+        RFCOMM_MAC_ADDRESS=""
+        save RFCOMM_MAC_ADDRESS
+        sleep 2
+    fi
+    tmp_file=$(mktemp)
+    expect ${QOS_DIR}/_script/bt_pair.exp "${tmp_file}"
+    read -r RFCOMM_MAC_ADDRESS < ${tmp_file}
+    check_var RFCOMM_MAC_ADDRESS || fault "Found no bluetooth MAC address for the radio"
+    echo "MAC ADDRESS: ${RFCOMM_MAC_ADDRESS}"
+    save RFCOMM_MAC_ADDRESS
+}
+
+config_menu() {
+    if [[ -z "$1" ]]; then
+        wizard menu "bbs config" \
+               "settings (Callsign) = ${BASH_SOURCE} config" \
+               "pair (BTECH UV-PRO and clones) = ${BASH_SOURCE} pair" \
+               "enable (rfcomm KISS service) = ${BASH_SOURCE} configure_rfcomm_service" \
+               "check (AX.25 connection) = ip link show dev ax0 || true" \
+               "show (Config) = (echo; set -x; cat $(realpath ${ENV_FILE})) "
+    else
+        "$@"
+    fi
+}
+
+config_ax25d() {
+    if [[ -z "$1" ]]; then
+        wizard menu "ax25d" \
+               "ax25d enable = ${BASH_SOURCE} configure_ax25d_service" \
+               "ax25d status = podman exec ax25d systemctl status ax25d || true" \
+               "ax25d logs = ${QOS_DIR}/ax25d/logs.sh || true" \
+               "ax25d disable = podman exec ax25d systemctl poweroff; systemctl disable --now ax25d.service ; podman rm -f ax25d" \
+               "ax25d shell = podman exec -it ax25d /bin/bash || true"
+    else
+        "$@"
+    fi
+}
+
+
+main() {
+    dependencies
+    if [[ -z "$1" ]]; then
+        wizard menu "bbs" \
+               "config = ${BASH_SOURCE} config_menu" \
+               "ax25d = ${BASH_SOURCE} config_ax25d"
+    else
+        "$@"
+    fi
+}
+
+main "$@"
