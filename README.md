@@ -1,4 +1,4 @@
-# QOS - a container OS for digital ham radio operators
+# QOS - a container OS for digital amateur radio operators
 
 QOS is a system to run various amateur radio applications inside of
 Podman containers. It includes a comprehensive menu driven
