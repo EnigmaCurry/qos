@@ -63,10 +63,10 @@ source <(qos bash_completion)
 
 The `qos` command has two different modes:
 
- * As a comprehensive menu driven interface.
- * As a pure command line tool.
+ * As a comprehensive menu driven interface to explore all subcommands.
+ * As a pure command line tool with explicit arguments.
  
-Run without any arguments, `qos` will show you the main menu:
+If run without any arguments, `qos` will show you the main menu:
 
 ```
 ? qos
@@ -75,53 +75,63 @@ Run without any arguments, `qos` will show you the main menu:
 [↑↓ to move, enter to select, type to filter, ESC to cancel]
 ```
 
-Use the arrow keys to navigate, and press Enter to select an item. To
-configure the global settings, navigate to the `config` menu, and then
-`settings`.
+Use the arrow keys to navigate, and press Enter to select an item. 
 
-You can also invoke any sub-menu or sub-command directly, providing
-the menu path from the command line arguments:
+To configure the global settings, navigate to the `config` menu, and
+then `settings`. Type your Callsign when requested, and do so for any
+other settings it asks for. The values you enter will be saved in the
+`.env` file.
+
+You can also invoke any sub-menu or sub-command directly from the
+command line:
 
 ```
 qos config settings
 ```
 
 This is two ways of doing the same thing. Throughout this document,
-the CLI interface will be shown for explicitness, but you can always
-do the same thing by menu diving in from the main `qos` entrypoint.
+the explicit CLI interface will be used in order to be unambiguous,
+but you should know as well that you can run any command by menu
+diving through the main `qos` entrypoint.
 
-## Pair radio
+## Pair radio and enable the rfcomm-kiss service
+
+Put your radio into pairing mode, and then invoke the pairing script:
 
 ```
-
+qos config radios pair
 ```
 
-## Setup AX.25
+If this does not work the first time, remove any existing pairings in
+the radio, power cycle the radio, and try again.
 
- * From the `QOS` main menu, choose `ax25`, and go through the
-   following sections:
-   * Choose `settings` and configure your station callsign.
-   * Put your radio into pairing mode, and then choose `pair`.
-   * Once paired, choose `enable (rfcomm KISS service)`.
-   * Choose `check (AX.25 connection)` and verify the service started.
+Enable the `rfcom-kiss` service to setup the serial KISS TNC device:
+
+```
+qos config radios rfcomm enable
+```
+
+Follow the directions it gives you:
+
+ * Power cycle the radio.
+ * Reboot.
+ * Check the rfcomm-kiss service is started and healthy
  
-If successful, the status should show the service is `Active: active
-(exited)`, and you should see the details for a network device named
-`ax0`, which does not show an IP address, but instead shows your
-station callsign, e.g.:
+```
+# After reboot:
+qos config radios rfcomm status
+```
+
+You should check that the service ran successfully:
 
 ```
-● rfcomm-kiss.service - Bind Bluetooth TNC and attach KISS interface
+● rfcomm-kiss.service - Bind Bluetooth KISS TNC
      Loaded: loaded (/etc/systemd/system/rfcomm-kiss.service; enabled; preset: enabled)
-     Active: active (exited) since Tue 2025-06-10 22:39:37 MDT; 21min ago
-...
-4: ax0: <BROADCAST,UP,LOWER_UP> mtu 255 qdisc pfifo_fast state UNKNOWN mode DEFAULT group default qlen 10
-    link/ax25 AI7XP-2 brd QST-0 permaddr LINUX-1
+     Active: active (exited) since Wed 2025-06-11 17:16:43 MDT; 23s ago
+....
+Jun 11 17:16:43 linux connect_radio.sh[584]: + rfcomm bind /dev/rfcomm0 38:XX:XX:XX:XX:XX 1
+Jun 11 17:16:43 linux systemd[1]: Finished rfcomm-kiss.service - Bind Bluetooth KISS TNC.
 ```
-
- * Reboot the machine and test that the interface is persistent and
-   comes back up (use the `check` menu again or run `ip link show dev
-   ax0`).
 
 ## Setup Radio
 

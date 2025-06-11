@@ -63,6 +63,10 @@ config_radios() {
     generate_menu "${QOS} config radios" "$@"
 }
 
+config_radios_rfcomm() {
+    generate_menu "${QOS} config radios rfcomm" "$@"
+}
+
 config_show() {
     echo ""
     echo "## ${ENV_FILE}"

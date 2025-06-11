@@ -8,18 +8,46 @@ QOS_DIR="$(realpath $(dirname ${QOS_BIN}))"
 ENV_FILE="${QOS_DIR}/.env"
 SCRIPT_DIR="${QOS_DIR}/_script"
 
-source ${QOS_DIR}/_script/funcs.sh
-source ${QOS_DIR}/_script/menu.sh
-source ${QOS_DIR}/_script/config.sh
-source ${QOS_DIR}/_script/apps.sh
-source ${QOS_DIR}/_script/radios.sh
+source ${SCRIPT_DIR}/funcs.sh
+source ${SCRIPT_DIR}/menu.sh
+source ${SCRIPT_DIR}/config.sh
+source ${SCRIPT_DIR}/apps.sh
+source ${SCRIPT_DIR}/radios.sh
 source ${SCRIPT_DIR}/bash_completion.sh
 
+MENU_BIN="${QOS_BIN}"
+MENU_ROOT="${QOS}"
+declare -A MENU_TREE=(
+    [$MENU_ROOT]="config apps"
+    [config]="settings radios show"
+    [config/radios]="pair rfcomm"
+    [config/radios/rfcomm]="enable status disable"
+    [apps]="ax25 ax25d"
+)
+
+declare -A MENU_DESC=(
+    [config]="Configuration commands"
+    [config/show]="Show current .env file"
+    [config/settings]="Edit settings like Callsign, SSID"
+    [config/radios]="Configure radios"
+    [config/radios/pair]="Pair bluetooth radio"
+    [config/radios/rfcomm]="Manage rfcomm service"
+    [config/radios/rfcomm/enable]="Enable rfcomm service"
+    [config/radios/rfcomm/disable]="Enable rfcomm service"
+    [config/radios/rfcomm/status]="Check rfcomm status"
+    [apps]="Application-specific commands"
+    [apps/ax25]="Configure AX.25"
+    [apps/ax25d]="Configure AX.25 daemon"
+)
+
 main() {
-    dependencies
     if [[ "$1" == "bash_completion" ]]; then
         bash_completion
+    elif [[ "$1" == "get" ]]; then
+        shift
+        get "$@"
     else
+        dependencies
         generate_menu "${QOS}" "$@"
     fi
 }
