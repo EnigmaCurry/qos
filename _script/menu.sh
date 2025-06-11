@@ -75,10 +75,9 @@ generate_menu() {
         printf -v padded "%-14s" "$sub"
         choices+=("${padded}${desc:+($desc)} = $cmd")
     done
-    if [[ "$title" == "${MENU_ROOT}" ]]; then
-        title="$title"
-    else
-        title="$title ${path//\// }"
+    title="${MENU_ROOT} ${path//\// }"
+    if [[ "$title" == "${MENU_ROOT} ${MENU_ROOT}" ]]; then
+        title="${MENU_ROOT}"
     fi
     wizard menu "$title" "${choices[@]}"
 }
