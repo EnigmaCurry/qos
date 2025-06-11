@@ -3,11 +3,11 @@
 set -e
 
 FEDORA_DEPENDENCIES=(
-    ax25-apps ax25-tools jq git curl expect bluez bluez-tools bluez-deprecated kernel-modules-extra
+    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools bluez-deprecated kernel-modules-extra
 )
 
 DEBIAN_DEPENDENCIES=(
-    ax25-apps ax25-tools jq git curl expect bluez bluez-tools
+    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools
 )
 
 dependencies() {
