@@ -44,7 +44,7 @@ here to setup Linux.
  * Download the QOS git repository:
  
 ```
-git clone https://github.com/EnigmaCurry/QOS.git ~/qos
+git clone https://github.com/EnigmaCurry/qos.git ~/qos
 cd ~/qos
 ```
 
@@ -131,7 +131,7 @@ Once updated, use the radio menu to setup the TNC:
        * Optional, on or off, depending if you like to hear the
        *outgoing* modem sounds.
  
- * Tune the radio to the desired frequency (e.g., `145.050`).
+ * Tune the radio to the desired frequency.
  
    * Consult your local band plan.
    * [ARRL](https://www.arrl.org/band-plan)
