@@ -2,42 +2,46 @@
 
 set -e
 
-QOS_DIR=$(realpath $(dirname ${BASH_SOURCE}))
+QOS_BIN=$(realpath ${BASH_SOURCE})
+QOS_DIR=$(realpath $(dirname ${QOS_BIN}))
 ENV_FILE=${QOS_DIR}/.env
 SCRIPT_DIR=$QOS_DIR/_script
 
 source ${QOS_DIR}/_script/funcs.sh
 source ${QOS_DIR}/_script/config.sh
+source ${QOS_DIR}/_script/menu.sh
+
+declare -A MENU_TREE=(
+    [root]="config apps"
+    [config]="settings show"
+    [apps]="ax25 ax25d"
+)
+
+declare -A MENU_DESC=(
+    [config]="Configuration commands"
+    [config/show]="Show current .env file"
+    [config/settings]="Edit settings like Callsign, SSID"
+    [apps]="Application-specific commands"
+    [apps/ax25]="Configure AX.25"
+    [apps/ax25d]="Configure AX.25 daemon"
+)
 
 main() {
     dependencies
-    if [[ -z "$1" ]]; then
-        wizard menu "qos" \
-               "config = ${BASH_SOURCE} config" \
-               "apps = ${BASH_SOURCE} apps"
-    else
-        dispatch_with_prefixes config apps -- "$@"
-    fi
+    generate_menu "qos" "$@"
 }
 
+
 config() {
-    if [[ -z "$1" ]]; then
-        wizard menu "qos config" \
-               "settings (Callsign etc.) = ${BASH_SOURCE} config" \
-               "show (.env) = (echo; set -x; cat $(realpath ${ENV_FILE})) "
-    else
-        dispatch_with_prefixes settings show -- "$@"
-    fi
+    generate_menu "qos config" "$@"
 }
 
 apps() {
-    if [[ -z "$1" ]]; then
-        wizard menu "qos apps" \
-               "ax25 = ${BASH_SOURCE} ax25" \
-               "ax25d = ${BASH_SOURCE} ax25d" \
-    else
-        dispatch_with_prefixes ax25 ax25d -- "$@"
-    fi
+    generate_menu "qos apps" "$@"
+}
+
+config_show() {
+    cat "$(realpath "$ENV_FILE")"
 }
 
 # config_ax25() {

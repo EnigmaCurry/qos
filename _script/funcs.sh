@@ -16,6 +16,38 @@ check_var(){
         fault
     fi
 }
+check_array() {
+    local __missing=false
+    local __arrays=("$@")
+    for __arr in "${__arrays[@]}"; do
+        if ! declare -p "$__arr" &>/dev/null; then
+            error "$__arr is not declared."
+            __missing=true
+            continue
+        fi
+        local __decl
+        __decl=$(declare -p "$__arr" 2>/dev/null)
+        if [[ $__decl == "declare -a"* ]]; then
+            # Indexed array
+            if [[ "$(eval echo \${#__arr[@]})" -eq 0 ]]; then
+                error "$__arr indexed array is empty."
+                __missing=true
+            fi
+        elif [[ $__decl == "declare -A"* ]]; then
+            # Associative array
+            if [[ "$(eval echo \${#__arr[@]})" -eq 0 ]]; then
+                error "$__arr associative array is empty."
+                __missing=true
+            fi
+        else
+            error "$__arr is not an array."
+            __missing=true
+        fi
+    done
+    if [[ $__missing == true ]]; then
+        fault
+    fi
+}
 debug_var() {
     local var=$1
     check_var var
@@ -369,33 +401,26 @@ check_not_root() {
     [ "$(id -u)" -ne 0 ];
 }
 
-dispatch_with_prefixes() {
-    #runs a command only if its name starts with one of the given prefixes;
-    #usage: dispatch_with_prefixes <prefix1> [prefix2 ...] -- <command> [args...].
-    #e.g., dispatch_with_prefixes prefix1 prefix2 prefix3 -- "$@"
-    local -a allowed=()
-    local arg cmd
-    local i
-    # Collect allowed prefixes until we hit '--'
-    while [[ "$1" != "--" && "$#" -gt 0 ]]; do
-        allowed+=("$1")
-        shift
-    done
-    # Remove the `--` separator
-    [[ "$1" == "--" ]] && shift
-    # Require at least one command
-    if [[ -z "$1" ]]; then
-        stderr "No command provided"
-        return 1
-    fi
-    cmd="$1"
-    shift
-    for prefix in "${allowed[@]}"; do
-        if [[ "$cmd" == "$prefix"* ]]; then
-            "$cmd" "$@"
+dispatch_path_command() {
+    local path="$1"
+    local sub="$2"
+    shift 2
+
+    local allowed_subs="${MENU_TREE[$path]}"
+    for allowed in $allowed_subs; do
+        if [[ "$sub" == "$allowed"* ]]; then
+            local func_name="${path}_${sub}"
+            func_name="${func_name// /_}"
+            if declare -F "$func_name" > /dev/null; then
+                "$func_name" "$@"
+            else
+                stderr "Function '$func_name' not implemented"
+                return 1
+            fi
             return
         fi
     done
-    stderr "Invalid command: must start with one of: ${allowed[*]}"
+
+    stderr "Invalid subcommand '$sub' for '$path'. Allowed: $allowed_subs"
     return 1
 }
