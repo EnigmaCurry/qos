@@ -46,8 +46,9 @@ validate_station_callsign() {
 }
 
 configure_callsign() {
-    ask_valid CALLSIGN "Enter your callsign (No station id suffix):" upcase validate_base_callsign
-    save CALLSIGN
+    if ask_valid CALLSIGN "Enter your callsign (No station id suffix):" upcase validate_base_callsign; then
+        save CALLSIGN
+    fi
 }
 
 configure_ssid() {
@@ -55,9 +56,15 @@ configure_ssid() {
 }
 
 config_settings() {
-    configure_callsign
+    configure_callsign || true
+}
+
+config_radios() {
+    generate_menu "${QOS} config radios" "$@"
 }
 
 config_show() {
+    echo ""
+    echo "## ${ENV_FILE}"
     cat "$(realpath "$ENV_FILE")"
 }

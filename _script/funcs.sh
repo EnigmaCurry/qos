@@ -215,7 +215,15 @@ ask_valid() {
         fi
     done
     while true; do
-        value=$(wizard ask "$prompt" "$(get "$varname")")
+        value=$(
+            bash -c '
+                set +e
+                '"${SCRIPT_DIR}/script-wizard"' ask "$1" "$2"
+            ' _ "$prompt" "$(get "$varname")"
+        )
+        if [[ "$?" == "1" ]]; then
+            return 1 # User cancelled.
+        fi
         # Apply mutators in order
         for mut in "${mutators[@]}"; do
             value="$("$mut" "$value")"
@@ -248,9 +256,10 @@ get() {
 save() {
    check_var ENV_FILE 1
    local existing="$(get $1)"
-   if [[ "$existing" != "${!1}" ]]; then
-       dotenv -f ${ENV_FILE} set $1="${!1}"
-       echo "# Saved ${ENV_FILE} : ${1}=${!1}"
+   local val="${!1}"
+   if [[ "$existing" != "${val}" ]]; then
+       dotenv -f ${ENV_FILE} set $1="${val}"
+       echo "# Saved ${ENV_FILE} : ${1}=${val}"
    fi
 }
 

@@ -48,15 +48,53 @@ git clone https://github.com/EnigmaCurry/qos.git ~/qos
 cd ~/qos
 ```
 
- * (Optional) Add `~/qos` to your `PATH` environment var.
+ * (Optional) Add `~/qos` to your `PATH` environment var and setup Bash completion.
  
 ```
 ## In ~/.bashrc
 export PATH="${PATH}:${HOME}/qos"
+source <(qos bash_completion)
 ```
 
  * To access the main menu, run `~/qos/qos` (or `qos`, if you modified
    the `PATH`).
+
+## Command Line and Menu driven interface
+
+The `qos` command has two different modes:
+
+ * As a comprehensive menu driven interface.
+ * As a pure command line tool.
+ 
+Run without any arguments, `qos` will show you the main menu:
+
+```
+? qos
+> config
+  apps
+[↑↓ to move, enter to select, type to filter, ESC to cancel]
+```
+
+Use the arrow keys to navigate, and press Enter to select an item. To
+configure the global settings, navigate to the `config` menu, and then
+`settings`.
+
+You can also invoke any sub-menu or sub-command directly, providing
+the menu path from the command line arguments:
+
+```
+qos config settings
+```
+
+This is two ways of doing the same thing. Throughout this document,
+the CLI interface will be shown for explicitness, but you can always
+do the same thing by menu diving in from the main `qos` entrypoint.
+
+## Pair radio
+
+```
+
+```
 
 ## Setup AX.25
 

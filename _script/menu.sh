@@ -1,3 +1,26 @@
+check_var QOS QOS_BIN
+
+MENU_BIN="${QOS_BIN}"
+MENU_ROOT="${QOS}"
+declare -A MENU_TREE=(
+    [$MENU_ROOT]="config apps"
+    [config]="settings radios show"
+    [config/radios]="pair"
+    [apps]="ax25 ax25d"
+)
+
+declare -A MENU_DESC=(
+    [config]="Configuration commands"
+    [config/show]="Show current .env file"
+    [config/settings]="Edit settings like Callsign, SSID"
+    [config/radios]="Configure radios"
+    [config/radios/pair]="Pair bluetooth radio"
+    [apps]="Application-specific commands"
+    [apps/ax25]="Configure AX.25"
+    [apps/ax25d]="Configure AX.25 daemon"
+)
+
+
 get_valid_subcommands() {
     check_array MENU_TREE
     local path="$1"
@@ -5,67 +28,57 @@ get_valid_subcommands() {
 }
 
 generate_menu() {
-    check_var QOS_BIN
+    check_var MENU_BIN MENU_ROOT
     check_array MENU_TREE MENU_DESC
 
     local title="$1"
     shift
 
-    local path
-    case "$title" in
-        qos) path="root" ;;
-        qos\ *) path="${title#qos }" ;;  # strip 'qos '
-        *) stderr "Could not infer path from title: $title"; return 1 ;;
-    esac
+    local -a args=("$@")
+    local path="${MENU_ROOT}"
 
-    # If extra args were passed (e.g. config show), dispatch or recurse
-    if [[ $# -gt 0 ]]; then
-        local sub="$1"
-        shift
+    # Walk down the MENU_TREE based on args
+    while [[ ${#args[@]} -gt 0 ]]; do
+        local candidate_path="${path}/${args[0]}"
+        candidate_path="${candidate_path#${MENU_ROOT}/}"
 
-        if [[ "$path" == "root" && "${MENU_TREE[$sub]+_}" ]]; then
-            local nested_path="$sub"
-
-            if [[ $# -gt 0 ]]; then
-                local nested_sub="$1"
-                shift
-                dispatch_path_command "$nested_path" "$nested_sub" "$@"
-            else
-                generate_menu "qos $nested_path"
-            fi
+        if [[ -n "${MENU_TREE[$candidate_path]}" ]]; then
+            path="$candidate_path"
+            args=("${args[@]:1}")  # shift
         else
-            dispatch_path_command "$path" "$sub" "$@"
+            break
+        fi
+    done
+
+    # If args remain, dispatch to appropriate function
+    if [[ ${#args[@]} -gt 0 ]]; then
+        local sub="${args[0]}"
+        shift
+        local func="${path//\//_}_${sub}"
+        if declare -f "$func" &>/dev/null; then
+            "$func" "$@"
+        else
+            stderr "No function: $func"
+            return 1
         fi
         return
     fi
 
-    local prefix=""
-    [[ "$path" != "root" ]] && prefix="$path "
-
-    local -a subs
-    IFS=' ' read -ra subs <<< "$(get_valid_subcommands "$path")"
-
-    # Find the longest subcommand name
-    local max_len=0
-    for sub in "${subs[@]}"; do
-        (( ${#sub} > max_len )) && max_len=${#sub}
-    done
-
-    # Construct aligned choices
+    # Otherwise, display menu
     local choices=()
-    for sub in "${subs[@]}"; do
+    local prefix="${path:+$path }"
+
+    for sub in ${MENU_TREE[$path]}; do
         local full_key="${path:+$path/}$sub"
         local desc="${MENU_DESC[$full_key]}"
-        local cmd="${QOS_BIN} ${prefix}${sub}"
-        if [[ -n "$desc" ]]; then
-            # Pad sub name to max_len + 2 spaces
-            printf -v padded "%-*s" $((max_len + 2)) "$sub"
-            choices+=("$padded($desc) = $cmd")
-        else
-            choices+=("$sub = $cmd")
-        fi
+        local cmd="${MENU_BIN} ${prefix}${sub}"
+        printf -v padded "%-14s" "$sub"
+        choices+=("${padded}${desc:+($desc)} = $cmd")
     done
-
-    #debug_array choices
+    if [[ "$title" == "${MENU_ROOT}" ]]; then
+        title="$title"
+    else
+        title="$title ${path//\// }"
+    fi
     wizard menu "$title" "${choices[@]}"
 }

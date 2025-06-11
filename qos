@@ -1,48 +1,39 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
-QOS_BIN=$(realpath ${BASH_SOURCE})
-QOS_DIR=$(realpath $(dirname ${QOS_BIN}))
-ENV_FILE=${QOS_DIR}/.env
-SCRIPT_DIR=$QOS_DIR/_script
+QOS="$(basename ${BASH_SOURCE})"
+QOS_BIN="$(realpath ${BASH_SOURCE})"
+QOS_DIR="$(realpath $(dirname ${QOS_BIN}))"
+ENV_FILE="${QOS_DIR}/.env"
+SCRIPT_DIR="${QOS_DIR}/_script"
 
 source ${QOS_DIR}/_script/funcs.sh
 source ${QOS_DIR}/_script/menu.sh
 source ${QOS_DIR}/_script/config.sh
 source ${QOS_DIR}/_script/apps.sh
-
-declare -A MENU_TREE=(
-    [root]="config apps"
-    [config]="settings show"
-    [apps]="ax25 ax25d"
-)
-
-declare -A MENU_DESC=(
-    [config]="Configuration commands"
-    [config/show]="Show current .env file"
-    [config/settings]="Edit settings like Callsign, SSID"
-    [apps]="Application-specific commands"
-    [apps/ax25]="Configure AX.25"
-    [apps/ax25d]="Configure AX.25 daemon"
-)
+source ${QOS_DIR}/_script/radios.sh
+source ${SCRIPT_DIR}/bash_completion.sh
 
 main() {
     dependencies
-    generate_menu "qos" "$@"
+    if [[ "$1" == "bash_completion" ]]; then
+        bash_completion
+    else
+        generate_menu "${QOS}" "$@"
+    fi
 }
 
-
 config() {
-    generate_menu "qos config" "$@"
+    generate_menu "${QOS} config" "$@"
 }
 
 apps() {
-    generate_menu "qos apps" "$@"
+    generate_menu "${QOS} apps" "$@"
 }
 
 # config_ax25() {
-#     wizard menu "QOS ax25" \
+#     wizard menu "${QOS} ax25" \
 #            "settings (Callsign) = ${BASH_SOURCE} config" \
 #            "pair (BTECH UV-PRO and clones) = ${BASH_SOURCE} pair || true" \
 #            "enable (rfcomm KISS service) = ${BASH_SOURCE} configure_rfcomm_service" \

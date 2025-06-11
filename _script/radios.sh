@@ -1,7 +1,7 @@
-pair_bluetooth_radio() {
+config_radios_pair() {
     RFCOMM_MAC_ADDRESS=$(get RFCOMM_MAC_ADDRESS)
     if [[ -n "$RFCOMM_MAC_ADDRESS" ]]; then
-        wizard confirm "Do you wish to unset the existing RFCOMM_MAC_ADDRESS (${RFCOMM_MAC_ADDRESS}) ?" yes
+        wizard confirm "Do you wish to unset the existing RFCOMM_MAC_ADDRESS (${RFCOMM_MAC_ADDRESS}) ?" no || return 0
         bluetoothctl remove "$RFCOMM_MAC_ADDRESS" || true
         RFCOMM_MAC_ADDRESS=""
         save RFCOMM_MAC_ADDRESS
