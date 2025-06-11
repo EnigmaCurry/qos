@@ -4,46 +4,57 @@ set -e
 
 QOS_DIR=$(realpath $(dirname ${BASH_SOURCE}))
 ENV_FILE=${QOS_DIR}/.env
+SCRIPT_DIR=$QOS_DIR/_script
 
 source ${QOS_DIR}/_script/funcs.sh
 source ${QOS_DIR}/_script/config.sh
 
-config_ax25() {
-    if [[ -z "$1" ]]; then
-        wizard menu "QOS ax25" \
-               "settings (Callsign) = ${BASH_SOURCE} config" \
-               "pair (BTECH UV-PRO and clones) = ${BASH_SOURCE} pair || true" \
-               "enable (rfcomm KISS service) = ${BASH_SOURCE} configure_rfcomm_service" \
-               "check (AX.25 connection) = ${BASH_SOURCE} check_rfcomm_kiss" 
-    else
-        "$@"
-    fi
-}
-
-config_ax25d() {
-    if [[ -z "$1" ]]; then
-        wizard menu "ax25d" \
-               "ax25d enable = ${BASH_SOURCE} configure_ax25d_service" \
-               "ax25d status = podman exec ax25d systemctl status ax25d || true" \
-               "ax25d logs = ${QOS_DIR}/ax25d/logs.sh || true" \
-               "ax25d disable = podman exec ax25d systemctl poweroff; systemctl disable --now ax25d.service ; podman rm -f ax25d" \
-               "ax25d shell = podman exec -it ax25d /bin/bash || true"
-    else
-        "$@"
-    fi
-}
-
-
 main() {
     dependencies
     if [[ -z "$1" ]]; then
-        wizard menu "QOS" \
-               "ax25 = ${BASH_SOURCE} config_ax25" \
-               "ax25d = ${BASH_SOURCE} config_ax25d" \
-               "config (read only) = (echo; set -x; cat $(realpath ${ENV_FILE})) "
+        wizard menu "qos" \
+               "config = ${BASH_SOURCE} config" \
+               "apps = ${BASH_SOURCE} apps"
     else
-        "$@"
+        dispatch_with_prefixes config apps -- "$@"
     fi
 }
+
+config() {
+    if [[ -z "$1" ]]; then
+        wizard menu "qos config" \
+               "settings (Callsign etc.) = ${BASH_SOURCE} config" \
+               "show (.env) = (echo; set -x; cat $(realpath ${ENV_FILE})) "
+    else
+        dispatch_with_prefixes settings show -- "$@"
+    fi
+}
+
+apps() {
+    if [[ -z "$1" ]]; then
+        wizard menu "qos apps" \
+               "ax25 = ${BASH_SOURCE} ax25" \
+               "ax25d = ${BASH_SOURCE} ax25d" \
+    else
+        dispatch_with_prefixes ax25 ax25d -- "$@"
+    fi
+}
+
+# config_ax25() {
+#     wizard menu "QOS ax25" \
+#            "settings (Callsign) = ${BASH_SOURCE} config" \
+#            "pair (BTECH UV-PRO and clones) = ${BASH_SOURCE} pair || true" \
+#            "enable (rfcomm KISS service) = ${BASH_SOURCE} configure_rfcomm_service" \
+#            "check (AX.25 connection) = ${BASH_SOURCE} check_rfcomm_kiss"
+# }
+
+# config_ax25d() {
+#     wizard menu "ax25d" \
+#            "ax25d enable = ${BASH_SOURCE} configure_ax25d_service" \
+#            "ax25d status = podman exec ax25d systemctl status ax25d || true" \
+#            "ax25d logs = ${QOS_DIR}/ax25d/logs.sh || true" \
+#            "ax25d disable = podman exec ax25d systemctl poweroff; systemctl disable --now ax25d.service ; podman rm -f ax25d" \
+#            "ax25d shell = podman exec -it ax25d /bin/bash || true"
+# }
 
 main "$@"
