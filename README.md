@@ -4,6 +4,8 @@ QOS is a system to run various amateur radio applications inside of
 Podman containers. It includes a comprehensive menu driven
 configuration and management tool. Make your next QSO with QOS.
 
+ALPHA!
+
 ## Dependencies
 
 A Linux computer that runs systemd:
