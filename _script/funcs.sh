@@ -2,7 +2,7 @@ stderr(){ echo "$@" >&2; }
 error(){ stderr "Error: $@"; }
 cancel(){ stderr "Canceled."; exit 2; }
 fault(){ test -n "$1" && error $1; stderr "Exiting."; exit 1; }
-wizard() { ${SCRIPT_DIR}/script-wizard "$@"; }
+wizard() { ${QOS_DIR}/_script/script-wizard "$@"; }
 check_var(){
     local __missing=false
     local __vars="$@"
@@ -13,6 +13,38 @@ check_var(){
         fi
     done
     if [[ ${__missing} == true ]]; then
+        fault
+    fi
+}
+check_array() {
+    local __missing=false
+    local __arrays=("$@")
+    for __arr in "${__arrays[@]}"; do
+        if ! declare -p "$__arr" &>/dev/null; then
+            error "$__arr is not declared."
+            __missing=true
+            continue
+        fi
+        local __decl
+        __decl=$(declare -p "$__arr" 2>/dev/null)
+        if [[ $__decl == "declare -a"* ]]; then
+            # Indexed array
+            if [[ "$(eval echo \${#__arr[@]})" -eq 0 ]]; then
+                error "$__arr indexed array is empty."
+                __missing=true
+            fi
+        elif [[ $__decl == "declare -A"* ]]; then
+            # Associative array
+            if [[ "$(eval echo \${#__arr[@]})" -eq 0 ]]; then
+                error "$__arr associative array is empty."
+                __missing=true
+            fi
+        else
+            error "$__arr is not an array."
+            __missing=true
+        fi
+    done
+    if [[ $__missing == true ]]; then
         fault
     fi
 }
@@ -154,7 +186,6 @@ install_script_wizard() {
         fi
         bash <(curl ${INSTALLER}) "${DEST}"
     fi
-    echo
 }
 
 ask_valid() {
@@ -184,7 +215,15 @@ ask_valid() {
         fi
     done
     while true; do
-        value=$(wizard ask "$prompt" "$(get "$varname")")
+        value=$(
+            bash -c '
+                set +e
+                '"${SCRIPT_DIR}/script-wizard"' ask "$1" "$2"
+            ' _ "$prompt" "$(get "$varname")"
+        )
+        if [[ "$?" == "1" ]]; then
+            return 1 # User cancelled.
+        fi
         # Apply mutators in order
         for mut in "${mutators[@]}"; do
             value="$("$mut" "$value")"
@@ -216,11 +255,12 @@ get() {
 
 save() {
    check_var ENV_FILE 1
-    local existing="$(get $1)"
-    if [[ "$existing" != "${!1}" ]]; then
-        dotenv -f ${ENV_FILE} set $1="${!1}"
-        echo "# Saved ${ENV_FILE} : ${1}=${!1}"
-    fi
+   local existing="$(get $1)"
+   local val="${!1}"
+   if [[ "$existing" != "${val}" ]]; then
+       dotenv -f ${ENV_FILE} set $1="${val}"
+       echo "# Saved ${ENV_FILE} : ${1}=${val}"
+   fi
 }
 
 set_default() {
@@ -274,47 +314,83 @@ validate_decimal() {
     fi
 }
 
+
+validate_alphanum() {
+    local input="$*"
+    # ^[[:alpha:]]        : first character must be a letter
+    # [[:alnum:]]*$       : remaining characters (if any) must be letters or digits
+    if [[ "$input" =~ ^[[:alpha:]][[:alnum:]]*$ ]]; then
+        return 0
+    else
+        stderr "Invalid input. Enter an alphanumeric string starting with a letter and containing only letters and digits."
+        return 1
+    fi
+}
+
 upcase() {
     local input="$*"
     echo "${input^^}"
 }
 
-validate_callsign() {
-    local input="$*"
-    if [[ "$input" =~ ^[[:alnum:]/-]+$ ]]; then
-        return 0
-    else
-        stderr "Invalid callsign. Use only letters, numbers, / or -."
-        return 1
-    fi
+check_is_systemd() {
+    [ "$(ps -p 1 -o comm=)" = "systemd" ]
 }
 
+check_is_debian() {
+    [ -f /etc/debian_version ]
+}
 
+check_is_fedora() {
+    [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]
+}
 
 install_packages() {
-    # Check if all packages are already installed
-    local missing=()
-    for pkg in "${@}"; do
-        dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
-    done
-    # If all are installed, return immediately
-    if [ ${#missing[@]} -eq 0 ]; then
-        echo -e "## All packages were found.\n"
-        return 0
+    if check_is_debian; then
+        # Debian/Ubuntu logic
+        local missing=()
+        for pkg in "$@"; do
+            dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
+        done
+        if [ ${#missing[@]} -eq 0 ]; then
+            return 0
+        fi
+        echo "Missing packages : ${missing[*]}"
+        wizard confirm "Do you wish to install these missing packages via apt?" yes
+        sudo apt update
+        sudo apt install -y "${missing[@]}"
+    elif check_is_fedora; then
+        # Fedora/CentOS/RHEL logic
+        local missing=()
+        for pkg in "$@"; do
+            rpm -q "$pkg" &>/dev/null || missing+=("$pkg")
+        done
+        if [ ${#missing[@]} -eq 0 ]; then
+            return 0
+        fi
+        echo "Missing packages : ${missing[*]}"
+        if check_rpm_ostree; then
+            wizard confirm "Do you wish to install these missing packages via rpm-ostree?" yes
+            sudo rpm-ostree install "${missing[@]}"
+            echo -e "\nYou must now reboot."
+            exit 0
+        else
+            wizard confirm "Do you wish to install these missing packages via dnf?" yes
+            sudo dnf install -y "${missing[@]}"
+        fi
+    else
+        echo "Unsupported system OS" >&2
+        cat /etc/os-release 2>/dev/null | grep "^NAME" || true
+        exit 1
     fi
-    echo "Installing missing packages: ${missing[*]}"
-    sudo apt update
-    sudo apt install -y "${missing[@]}"
-    echo
 }
 
-check_os_is_debian() {
-    if [ ! -f /etc/debian_version ]; then
-        fault "This script only supports Debian-based systems."
-    else
-        echo "## Debian $(cat /etc/debian_version) or similar OS detected."
+check_rpm_ostree() {
+    if command -v rpm-ostree >/dev/null 2>&1; then
+        if rpm-ostree status >/dev/null 2>&1; then
+            return 0
+        fi
     fi
-
+    return 1
 }
 
 check_has_sudo() {
@@ -325,187 +401,34 @@ check_has_sudo() {
     fi
 }
 
+check_root() {
+    [ "$(id -u)" -eq 0 ]
+}
+
 check_not_root() {
-    if [ "$(id -u)" -eq 0 ]; then
-        fault "Error: This script should not be run as root."
-    fi
+    [ "$(id -u)" -ne 0 ];
 }
 
-create_asoundrc() {
-    local card="$1"
-    local device="${2:-0}"
-    local ALSA_DEV_ALIAS=$(get ALSA_DEV_ALIAS radio)
-    check_var card
-    cat <<EOF > ${HOME}/.asoundrc
-pcm.$ALSA_DEV_ALIAS {
-    type plug
-    slave {
-        pcm {
-            type hw
-            card $card
-            device $device
-        }
-    }
-}
+dispatch_path_command() {
+    local path="$1"
+    local sub="$2"
+    shift 2
 
-ctl.$ALSA_DEV_ALIAS {
-    type hw
-    card $card
-}
-
-pcm.default {
-    type plug
-    slave.pcm "${ALSA_DEV_ALIAS}"
-}
-
-ctl.default {
-    type hw
-    card $card
-}
-EOF
-}
-
-create_direwolf_config() {
-    check_var ENV_FILE
-    CALLSIGN="$(get CALLSIGN)"
-    cat <<EOF > ${SCRIPT_DIR}/direwolf.conf
-## DON'T EDIT ${SCRIPT_DIR}/direwolf.conf!
-## This file is overwritten by the main BBS config script each time it is run.
-EOF
-    cat <<EOF >> ${SCRIPT_DIR}/direwolf.conf
-ADEVICE  radio
-EOF
-    cat <<EOF >> ${SCRIPT_DIR}/direwolf.conf
-CHANNEL 0
-MYCALL ${CALLSIGN}
-MODEM 1200
-EOF
-if [[ -n "${PTT_RTS_DEVICE}" ]]; then
-    cat <<EOF >> ${SCRIPT_DIR}/direwolf.conf
-PTT ${PTT_RTS_DEVICE} RTS
-EOF
-fi
-}
-
-enable_direwolf_service() {
-    check_var SCRIPT_DIR
-    mkdir -p ${HOME}/.config/systemd/user
-    cat <<EOF > ${HOME}/.config/systemd/user/direwolf.service
-## DON'T EDIT THIS SERVICE FILE!
-## IT IS GENERATED BY THE BBS ADMIN SCRIPT.
-[Unit]
-Description=DireWolf TNC for AX.25
-AssertPathExists=${SCRIPT_DIR}/direwolf.conf
-After=sound.target
-
-[Service]
-Type=simple
-ExecStart=${SCRIPT_DIR}/bbs.sh start_direwolf
-Restart=on-failure
-Environment=HOME=%h
-WorkingDirectory=${SCRIPT_DIR}
-
-[Install]
-WantedBy=default.target
-EOF
-    systemctl --user daemon-reload
-    systemctl --user stop direwolf
-    systemctl --user enable --now direwolf
-    systemctl --user status direwolf
-}
-
-disable_direwolf_service() {
-    local unit="${HOME}/.config/systemd/user/direwolf.service"
-    echo "Stopping direwolf service (if running)..."
-    if systemctl --user is-active --quiet direwolf; then
-        systemctl --user stop direwolf
-        echo "✔️  Direwolf service stopped."
-    else
-        echo "ℹ️  Direwolf service was not running."
-    fi
-    if [[ -f "$unit" ]]; then
-        rm -f "$unit"
-        echo "🗑️  Removed service file: $unit"
-    else
-        echo "ℹ️  Service file not found, nothing to remove."
-    fi
-    systemctl --user daemon-reload
-    echo "🔄 Systemd user daemon reloaded."
-    return 0
-}
-
-set_sound_volumes() {
-    local SOUND_DEVICE
-    SOUND_DEVICE="$(get SOUND_DEVICE)"
-    local SOUND_VOLUME_INPUT
-    SOUND_VOLUME_INPUT="$(get SOUND_VOLUME_INPUT 0)"
-    local SOUND_VOLUME_OUTPUT
-    SOUND_VOLUME_OUTPUT="$(get SOUND_VOLUME_OUTPUT 0.25)"
-    check_var SOUND_DEVICE SOUND_VOLUME_INPUT SOUND_VOLUME_OUTPUT
-    local card_index
-    card_index=$(get_sound_card_index "$SOUND_DEVICE") || return 1
-    local input_percent output_percent
-    input_percent=$(awk -v v="$SOUND_VOLUME_INPUT" 'BEGIN { printf "%d%%", v * 100 }')
-    output_percent=$(awk -v v="$SOUND_VOLUME_OUTPUT" 'BEGIN { printf "%d%%", v * 100 }')
-    # Unmute and set playback (output) volume
-    amixer -c "$card_index" sset Master "$output_percent" unmute || true
-    amixer -c "$card_index" sset Speaker "$output_percent" unmute || true
-    amixer -c "$card_index" sset PCM "$output_percent" unmute || true
-    # Unmute and set capture (input) volume
-    amixer -c "$card_index" sset Capture "$input_percent" cap || true
-    amixer -c "$card_index" sset Mic "$input_percent" cap || true
-}
-
-
-start_direwolf() {
-    local SOUND_DEVICE="$(get SOUND_DEVICE)"
-    check_var SOUND_DEVICE
-    local device_index=$(get_sound_card_index "${SOUND_DEVICE}")
-    create_asoundrc "${device_index}"
-    create_direwolf_config
-    set_sound_volumes
-    /usr/bin/direwolf -p -t 0 -c "${SCRIPT_DIR}/direwolf.conf"
-}
-
-list_alsa_device_names() {
-    local buffer=""
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*([0-9]+)[[:space:]]+\[([^\]]+)\][[:space:]]*:\ ([^[:space:]]+)\ -\ (.*)$ ]]; then
-            # If there's a previous buffered description, print it
-            if [[ -n "$buffer" ]]; then
-                echo "$buffer"
+    local allowed_subs="${MENU_TREE[$path]}"
+    for allowed in $allowed_subs; do
+        if [[ "$sub" == "$allowed"* ]]; then
+            local func_name="${path}_${sub}"
+            func_name="${func_name// /_}"
+            if declare -F "$func_name" > /dev/null; then
+                "$func_name" "$@"
+            else
+                stderr "Function '$func_name' not implemented"
+                return 1
             fi
-            buffer="${BASH_REMATCH[3]} - ${BASH_REMATCH[4]}|"
-        elif [[ -n "$buffer" && -n "$line" ]]; then
-            # Trim leading whitespace from continuation line
-            line="${line#"${line%%[![:space:]]*}"}"
-            buffer+="$line"
+            return
         fi
-    done < /proc/asound/cards
-    # Print last buffer
-    if [[ -n "$buffer" ]]; then
-        echo "$buffer"
-    fi
-}
+    done
 
-get_sound_card_index() {
-    local search="$1"
-    check_var search
-    local index=""
-    local current_index=""
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*([0-9]+)[[:space:]]+\[([^\]]+)\][[:space:]]*:\ ([^[:space:]]+)\ -\ (.*)$ ]]; then
-            current_index="${BASH_REMATCH[1]}"
-            local dev="${BASH_REMATCH[3]} - ${BASH_REMATCH[4]}"
-            if [[ "$dev" == "$search" ]]; then
-                index="$current_index"
-                break
-            fi
-        fi
-    done < /proc/asound/cards
-    if [[ -n "$index" ]]; then
-        echo "$index"
-    else
-        fault "Could not find card index for: $search"
-    fi
+    stderr "Invalid subcommand '$sub' for '$path'. Allowed: $allowed_subs"
+    return 1
 }

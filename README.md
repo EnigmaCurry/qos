@@ -1,23 +1,145 @@
-# AX.25 Packet BBS
+# QOS - a container OS for digital amateur radio operators
 
-This is an electronic bulletin board system (BBS) that operates on
-amateur (ham) radio. No Internet required!
+QOS is a system to run various amateur radio applications inside of
+Podman containers. It includes a comprehensive menu driven
+configuration and management tool. Make your next QSO with QOS.
 
-## Goal
+ALPHA!
 
-To setup a Raspberry Pi to operate a 1200 baud AFSK BBS service on 2M
-or 70cm FM amateur radio. The station will use a BTECH UV-PRO amateur
-radio (HT), which includes a bluetooth KISS TNC that can be paired and
-bonded with the Linux bluetooth and AX.25 network stack. 
+## Dependencies
 
-## Prep a Raspberry Pi
+A Linux computer that runs systemd:
 
- * [Install Raspberry Pi OS 64 bit
-   *lite*](https://www.raspberrypi.com/software/) (lite version is for
-   creating a server with no desktop).
+ * Only the following distributions are supported:
+   * Debian or debian-like (including Raspberry Pi OS)
+   * Fedora (including all spins, including atomic/rpm-ostree)
+   * (Support could be added for any distribution that can run systemd
+     and has a package for podman.)
 
-## Common Setup for all AX.25 peers
+Support for the following radios is available:
+
+ * BTECH UV-PRO, Vero VR‑N76, Radioddity GA-5WB (these are all
+   essentially the same radio) - these radios feature a bluetooth
+   (serial) KISS TNC, which is directly supported by the Linux kernel
+   AX.25 stack (direwolf is not required).
+ * More radios TODO.
+
+## Get started
+
 ### Setup radio
+
+Follow the directions to setup your specific radio, then come back
+here to setup Linux.
+
+ * [BTECH UV-PRO, Vero VR-N76, Radioddity GA-5WB](#btech-uv-pro-vero-vr-n76-radioddity-ga-5wb)
+
+### Setup Linux
+
+ * Log in to the Linux system as `root`.
+ * Install the `git` package.
+   * Debian:
+     * `sudo apt install git`
+   * Fedora: 
+     * for dnf based systems: `sudo dnf install git`
+     * for rpm-ostree based systems: `sudo rpm-ostree install git` (and then reboot).
+     
+ * Download the QOS git repository:
+ 
+```
+git clone https://github.com/EnigmaCurry/qos.git ~/qos
+cd ~/qos
+```
+
+ * (Optional) Add `~/qos` to your `PATH` environment var and setup Bash completion.
+ 
+```
+## In ~/.bashrc
+export PATH="${PATH}:${HOME}/qos"
+source <(qos bash_completion)
+```
+
+ * To access the main menu, run `~/qos/qos` (or `qos`, if you modified
+   the `PATH`).
+
+## Command Line and Menu driven interface
+
+The `qos` command has two different modes:
+
+ * As a comprehensive menu driven interface to explore all subcommands.
+ * As a pure command line tool with explicit arguments.
+ 
+If run without any arguments, `qos` will show you the main menu:
+
+```
+? qos
+> config
+  apps
+[↑↓ to move, enter to select, type to filter, ESC to cancel]
+```
+
+Use the arrow keys to navigate, and press Enter to select an item. 
+
+To configure the global settings, navigate to the `config` menu, and
+then `settings`. Type your Callsign when requested, and do so for any
+other settings it asks for. The values you enter will be saved in the
+`.env` file.
+
+You can also invoke any sub-menu or sub-command directly from the
+command line:
+
+```
+qos config settings
+```
+
+This is two ways of doing the same thing. Throughout this document,
+the explicit CLI interface will be used in order to be unambiguous,
+but you should know as well that you can run any command by menu
+diving through the main `qos` entrypoint.
+
+## Pair radio and enable the rfcomm-kiss service
+
+Put your radio into pairing mode, and then invoke the pairing script:
+
+```
+qos config radios pair
+```
+
+If this does not work the first time, remove any existing pairings in
+the radio, power cycle the radio, and try again.
+
+Enable the `rfcom-kiss` service to setup the serial KISS TNC device:
+
+```
+qos config radios rfcomm enable
+```
+
+Follow the directions it gives you:
+
+ * Power cycle the radio.
+ * Reboot.
+ * Check the rfcomm-kiss service is started and healthy
+ 
+```
+# After reboot:
+qos config radios rfcomm status
+```
+
+You should check that the service ran successfully:
+
+```
+● rfcomm-kiss.service - Bind Bluetooth KISS TNC
+     Loaded: loaded (/etc/systemd/system/rfcomm-kiss.service; enabled; preset: enabled)
+     Active: active (exited) since Wed 2025-06-11 17:16:43 MDT; 23s ago
+....
+Jun 11 17:16:43 linux connect_radio.sh[584]: + rfcomm bind /dev/rfcomm0 38:XX:XX:XX:XX:XX 1
+Jun 11 17:16:43 linux systemd[1]: Finished rfcomm-kiss.service - Bind Bluetooth KISS TNC.
+```
+
+## Setup Radio
+
+Here are instructions for specific radios
+
+### BTECH UV-PRO, Vero VR-N76, Radioddity GA-5WB
 
 The BTECH UV-PRO (and similar radios) need to be updated to run the
 latest firmware. To do this follow these steps:
@@ -40,7 +162,7 @@ Once updated, use the radio menu to setup the TNC:
  * Under Menu
    * `General Settings`
      * `Connection`
-       * Find the smartphone you paired earlier, and UNPAIR it, so
+       * Find the smartphone you paired earlier, and `UNPAIR` it, so
          that it won't interfere with your Linux connection.
      * `Signaling Settings`
        * Set the `ID` to your station callsign + id. This setting is
@@ -52,167 +174,40 @@ Once updated, use the radio menu to setup the TNC:
        * `Enable KISS TNC` (toggle ON)
    * `Radio Settings`
      * `Power` 
-       * Choose high, medium, or low, depending on your range.
+       * Choose the low power setting for testing, and increase it
+         depending on your need.
      * `Tail Elimination` (toggle OFF)
      * `Digital Mute`
        * Optional, on or off, depending if you like to hear the
        *outgoing* modem sounds.
  
  * Tune the radio to the desired frequency.
+ 
+   * Consult your local band plan.
+   * [ARRL](https://www.arrl.org/band-plan)
+     * [Packet Radio Frequency Recommendations of the Committee on
+       Amatuer Radio Digital
+       Communication](https://www.arrl.org/files/file/8803051.pdf)
+   * [UTVHF society](https://utahvhfs.org/bandplan1.html)
+   * Suggestions:
+     * `145.01`, `145.03`, `145.05`, `145.07`, `145.09`
+   
  * Turn the radio off and back on.
 
-### Install dependencies
-
-```
-sudo apt update
-sudo apt upgrade
-sudo apt install -y ax25-tools ax25-apps expect git
-
-git clone https://github.com/EnigmaCurry/bbs.git ~/bbs
-```
-
-### Configure your callsign + station ID
-
-```
-MY_CALLSIGN=AI7XP-2
-
-echo "${MY_CALLSIGN}" | tee ~/bbs/my_callsign.txt
-```
-
-### Configure AX.25 ports
-
-```
-read -r MY_CALLSIGN < ~/bbs/my_callsign.txt
-echo "radio    ${MY_CALLSIGN}    1200    255    2    BTECH UV-PRO" \
-    | sudo tee /etc/ax25/axports
-```
-
-### Pair radio bluetooth
-
-```
-~/bbs/bt_pair.exp
-```
-
-### Bring up radio interface
-
-```
-~/bbs/connect_radio.sh
-```
-
-### Verify `ax0` device exists
-
-```
-$ ip link
-...
-4: ax0: <BROADCAST,UP,LOWER_UP> mtu 255 qdisc pfifo_fast state UNKNOWN group default qlen 10
-    link/ax25 AI7XP-1 brd QST-0 permaddr LINUX-1
-```
-
-
-## Setup server
-### Enable ax25d
-
-```
-read -r MY_CALLSIGN < ~/bbs/my_callsign.txt
-
-cat <<EOF | sudo tee /etc/ax25/ax25d.conf
-[${MY_CALLSIGN}]
-default * * * * * * *  ${USER}  ${HOME}/bbs/bbs.py BBS ${MY_CALLSIGN} %S
-EOF
-
-
-cat <<EOF | sudo tee /etc/systemd/system/ax25d.service
-[Unit]
-Description=AX.25 Daemon
-After=rfcomm-kiss.service
-
-[Service]
-Type=forking
-ExecStart=/usr/sbin/ax25d -l
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now ax25d &
-```
-
-### Create service to bring up the TNC on system boot
-
-```
-cat <<EOF | sudo tee /etc/systemd/system/rfcomm-kiss.service
-[Unit]
-Description=Bind Bluetooth TNC and attach KISS interface
-After=bluetooth.target network.target
-Requires=bluetooth.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=true
-User=${USER}
-WorkingDirectory=${HOME}
-Environment=HOME=${HOME}
-ExecStart=${HOME}/bbs/connect_radio.sh
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable rfcomm-kiss
-```
-
-### Reboot the system to test the startup
-
-After rebooting the pi, you can check the status of the `rfcomm-kiss`
-service:
-
-```
-sudo systemctl status rfcomm-kiss
-```
-
-If the service is operational, the last line of this log should read:
-
-```
-The ax0 device still exists after waiting a bit, so it's probably working.
-```
-
-This means that the startup script set up the AX.25 connection using
-the bluetooth TNC, and it waited a bit, and it checked that it was
-still there. This is the only reliably way I have found to detect if
-the connection is going to work or not. For more details, see the
-Troublshooting section.
-
-## Setup client
-
- * Install Linux on a second computer.
- * Connect another radio to it.
- * Follow the section for [Common Setup for all AX.25 peers](#common-setup-for-all-ax25-peers).
- * Don't setup ax25d on the client.
-
-### Test calling the BBS
-
-On the server, start `axlisten` so you can see the incoming
-transmissions:
-
-```
-## On the server, keep this running in its own window for debugging purposes:
-sudo axlisten
-```
-
-```
-## On the client machine, call the station id of your BBS:
-axcall -h radio AI7XP-2
-```
-
-## Troubleshooting
+#### Troubleshooting
 
 > The radio's bluetooth was working, but now it's not!
 
 As of firmware 0.8.4-2, the TNC connection is working reliably on the
 first connection only. This means that whenever you reboot your Linux
 computer, you also need to power cycle the radio. 
+
+## Credits
+
+This software repository includes many scripts and things taken from
+elsewhere. Here is a catalog of them all:
+
+ * Bluetooth pairing script ([bt_pair.exp](_script/bt_pair.exp)) for
+   the BTECH UV-PRO, taken from
+   [TheCommsChannel/TC2-APRS-BBS](https://github.com/TheCommsChannel/TC2-APRS-BBS)
+   (GPLv3).
