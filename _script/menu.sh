@@ -1,3 +1,28 @@
+MENU_BIN="${QOS_BIN}"
+MENU_ROOT="${QOS}"
+declare -A MENU_TREE=(
+    [$MENU_ROOT]="config apps"
+    [config]="settings radios show"
+    [config/radios]="pair rfcomm"
+    [config/radios/rfcomm]="enable status disable"
+    [apps]="ax25 ax25d"
+)
+
+declare -A MENU_DESC=(
+    [config]="Configuration commands"
+    [config/show]="Show current .env file"
+    [config/settings]="Edit settings like Callsign, SSID"
+    [config/radios]="Configure radios"
+    [config/radios/pair]="Pair bluetooth radio"
+    [config/radios/rfcomm]="Manage rfcomm service"
+    [config/radios/rfcomm/enable]="Enable rfcomm service"
+    [config/radios/rfcomm/disable]="Enable rfcomm service"
+    [config/radios/rfcomm/status]="Check rfcomm status"
+    [apps]="Application-specific commands"
+    [apps/ax25]="Configure AX.25"
+    [apps/ax25d]="Configure AX.25 daemon"
+)
+
 get_valid_subcommands() {
     check_array MENU_TREE
     local path="$1"

@@ -3,7 +3,7 @@ FROM fedora:42
 ENV container podman
 
 # Install dependencies
-RUN dnf -y install systemd git procps python3 python3-pip && \
+RUN dnf -y install systemd git procps python3 python3-pip iputils iproute && \
     dnf clean all
 
 # Create unprivileged user

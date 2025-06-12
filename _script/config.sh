@@ -2,11 +2,11 @@ check_var SCRIPT_DIR
 source ${SCRIPT_DIR}/ssid.sh
 
 FEDORA_DEPENDENCIES=(
-    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools bluez-deprecated kernel-modules-extra
+    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools bluez-deprecated kernel-modules-extra socat
 )
 
 DEBIAN_DEPENDENCIES=(
-    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools
+    podman ax25-apps ax25-tools jq git curl expect bluez bluez-tools socat
 )
 
 dependencies() {

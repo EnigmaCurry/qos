@@ -7,7 +7,7 @@ ARG TNCATTACH_GIT_REPO=https://github.com/markqvist/tncattach.git
 ARG TNCATTACH_BRANCH=master
 
 # Install build dependencies
-RUN dnf -y install git make gcc && dnf clean all
+RUN dnf -y install git make gcc iputils iproute && dnf clean all
 
 # Clone and checkout the specified branch
 RUN git clone --branch ${TNCATTACH_BRANCH} ${TNCATTACH_GIT_REPO} /src
