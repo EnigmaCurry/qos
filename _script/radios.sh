@@ -52,6 +52,8 @@ config_radios_rfcomm_disable() {
 
 config_radios_rfcomm_status() {
     sudo systemctl status --no-pager rfcomm-kiss || true
+    echo
+    sudo stat /dev/rfcomm0
 }
 
 config_radios_pair() {
