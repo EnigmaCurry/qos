@@ -2,6 +2,7 @@
 import aprs
 import sys
 import os
+from pprint import pprint
 
 DEVICE = os.getenv("DEVICE", "/dev/rfcomm0")
 BAUDRATE = int(os.getenv("BAUDRATE", "9600"))
@@ -14,10 +15,9 @@ def main():
     print(f"Listening for APRS UI frames on {DEVICE} at {BAUDRATE} baud...\n")
     try:
         while True:
-            packet = aprs_serial.read()
-            if not packet:
-                continue
-            print_packet(packet)
+            packets = aprs_serial.read()
+            for packet in packets:
+                print_packet(packet)
     except KeyboardInterrupt:
         print("\nExiting...")
     finally:
@@ -31,7 +31,12 @@ def print_packet(packet):
             print(f" via {','.join(packet.path)}")
         else:
             print()
-        print(f"  [{packet.type}] {packet.text}\n")
+        ptype = getattr(packet, "type", "unknown")
+        info = getattr(packet, "info", None)
+        if info:
+            text = str(getattr(info, "text", "<no text>"))
+            addressee = str(getattr(info, "addressee", "<no destination>"))
+            print(f"  [{ptype}] [to:{addressee}] {text}\n")
     except Exception as e:
         print(f"[!] Failed to decode packet: {e}", file=sys.stderr)
 
